@@ -1,0 +1,221 @@
+package com.example.v.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.FlashOn
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.v.models.Server
+import com.example.v.models.mockServers
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ServerListScreen(
+    selectedServer: Server?,
+    onServerSelect: (Server) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        // Header
+        Text(
+            text = "Select Server",
+            style = MaterialTheme.typography.headlineMedium,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(bottom = 24.dp)
+        )
+
+        // Quick Connect button
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable {
+                    // Select fastest server (lowest ping)
+                    val fastestServer = mockServers.minByOrNull { it.ping }
+                    fastestServer?.let { onServerSelect(it) }
+                },
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.primary
+            )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.FlashOn,
+                    contentDescription = "Quick Connect",
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(
+                    text = "Quick Connect",
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        // Server list
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            items(mockServers) { server ->
+                ServerItem(
+                    server = server,
+                    isSelected = server.id == selectedServer?.id,
+                    onSelect = { onServerSelect(server) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun ServerItem(
+    server: Server,
+    isSelected: Boolean,
+    onSelect: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onSelect() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSelected) {
+                MaterialTheme.colorScheme.primaryContainer
+            } else {
+                MaterialTheme.colorScheme.surface
+            }
+        ),
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isSelected) 8.dp else 2.dp
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Flag
+            Text(
+                text = server.flagEmoji,
+                fontSize = 28.sp,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+
+            // Country and city
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = server.country,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+                Text(
+                    text = server.city,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    }
+                )
+            }
+
+            // Server stats
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Ping indicator
+                    val pingColor = when {
+                        server.ping < 30 -> androidx.compose.ui.graphics.Color(0xFF4CAF50)
+                        server.ping < 100 -> androidx.compose.ui.graphics.Color(0xFFFF9800)
+                        else -> androidx.compose.ui.graphics.Color(0xFFF44336)
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(
+                                color = pingColor,
+                                shape = androidx.compose.foundation.shape.CircleShape
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "${server.ping}ms",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isSelected) {
+                            MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                        }
+                    )
+                }
+                Text(
+                    text = "${server.load}% load",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                    } else {
+                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            // Connect button
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.FlashOn,
+                    contentDescription = "Connected",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(24.dp)
+                )
+            } else {
+                OutlinedButton(
+                    onClick = onSelect,
+                    modifier = Modifier.height(36.dp)
+                ) {
+                    Text(
+                        text = "Connect",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        }
+    }
+}
