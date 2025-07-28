@@ -33,7 +33,7 @@ fun GoogleSignInButton(
         ),
         border = ButtonDefaults.outlinedButtonBorder.copy(
             width = 1.dp,
-            brush = SolidColor(MaterialTheme.colorScheme.outline)
+            brush = SolidColor(Color.Gray)
         )
     ) {
         Row(

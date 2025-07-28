@@ -2,8 +2,10 @@ package com.example.v
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -16,8 +18,10 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.v.models.Server
+import com.example.v.screens.AIAnalyzerScreen
 import com.example.v.screens.HomeScreen
 import com.example.v.screens.ServerListScreen
+import com.example.v.screens.ServersScreen
 import com.example.v.screens.SettingsScreen
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,7 +43,8 @@ fun VPNNavigation(
 
                 listOf(
                     BottomNavItem("home", "Home", Icons.Default.Home),
-                    BottomNavItem("servers", "Servers", Icons.Default.List),
+                    BottomNavItem("servers", "Servers", Icons.Default.Public),
+                    BottomNavItem("analyzer", "AI Analyzer", Icons.Default.Analytics),
                     BottomNavItem("settings", "Settings", Icons.Default.Settings)
                 ).forEach { item ->
                     NavigationBarItem(
@@ -76,7 +81,7 @@ fun VPNNavigation(
                 )
             }
             composable("servers") {
-                ServerListScreen(
+                ServersScreen(
                     selectedServer = selectedServer,
                     onServerSelect = { server ->
                         selectedServer = server
@@ -84,17 +89,11 @@ fun VPNNavigation(
                     }
                 )
             }
+            composable("analyzer") {
+                AIAnalyzerScreen()
+            }
             composable("settings") {
-                SettingsScreen(
-                    onBackPressed = { navController.popBackStack() },
-                    onSignOut = onSignOut,
-                    onEditAccount = { navController.navigate("editAccount") },
-                    onShowSubscription = { navController.navigate("subscription") },
-                    onLanguageSettings = { navController.navigate("language") },
-                    onNotificationSettings = { navController.navigate("notifications") },
-                    onPrivacyPolicy = { navController.navigate("privacyPolicy") },
-                    onTermsOfService = { navController.navigate("termsOfService") }
-                )
+                SettingsScreen(onSignOut = onSignOut)
             }
         }
     }

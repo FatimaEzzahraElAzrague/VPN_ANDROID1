@@ -12,6 +12,8 @@ import androidx.compose.material.icons.filled.ArrowForward
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -26,6 +28,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.v.models.Server
+import com.example.v.components.AnimatedConnectButton
+import kotlinx.coroutines.launch
 import kotlin.math.cos
 import kotlin.math.sin
 
@@ -39,16 +43,21 @@ fun HomeScreen(
     onConnectToggle: () -> Unit,
     onServerClick: () -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "pulse")
-    val pulseScale by infiniteTransition.animateFloat(
-        initialValue = 1f,
-        targetValue = if (isConnected) 1.1f else 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = EaseInOut),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulse"
-    )
+    var isConnecting by remember { mutableStateOf(false) }
+    var connectionDuration by remember { mutableStateOf(0L) }
+
+    // Timer for connection duration
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            val startTime = System.currentTimeMillis()
+            while (isConnected) {
+                connectionDuration = System.currentTimeMillis() - startTime
+                kotlinx.coroutines.delay(1000)
+            }
+        } else {
+            connectionDuration = 0L
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -93,7 +102,43 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // Connection status
+            // VPN Status
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isConnected) {
+                        Color(0xFF4CAF50).copy(alpha = 0.1f)
+                    } else {
+                        Color(0xFFFF6B35).copy(alpha = 0.1f)
+                    }
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = if (isConnected) Icons.Default.Security else Icons.Default.Warning,
+                        contentDescription = null,
+                        tint = if (isConnected) Color(0xFF4CAF50) else Color(0xFFFF6B35),
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = if (isConnected) "SECURE" else "NOT SECURE",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFFF6B35)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // Connection status (legacy text)
             Text(
                 text = if (isConnected) "CONNECTED" else "DISCONNECTED",
                 style = MaterialTheme.typography.headlineSmall,
@@ -103,51 +148,120 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // Connect/Disconnect button
-            Box(
-                modifier = Modifier
-                    .size(200.dp)
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .background(
-                        brush = Brush.radialGradient(
-                            colors = if (isConnected) {
-                                listOf(Color(0xFF4CAF50), Color(0xFF2E7D32))
-                            } else {
-                                listOf(Color(0xFFFF6B35), Color(0xFFE65100))
-                            }
-                        )
-                    )
-                    .clickable { onConnectToggle() },
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Power,
-                        contentDescription = if (isConnected) "Disconnect" else "Connect",
-                        tint = Color.White,
-                        modifier = Modifier.size(48.dp)
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = if (isConnected) "DISCONNECT" else "CONNECT",
-                        color = Color.White,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+            // Animated Connect/Disconnect button
+            AnimatedConnectButton(
+                isConnected = isConnected,
+                isConnecting = isConnecting,
+                onClick = {
+                    if (!isConnected && !isConnecting) {
+                        isConnecting = true
+                        // Simulate connection delay
+                        kotlinx.coroutines.GlobalScope.launch {
+                            kotlinx.coroutines.delay(3000)
+                            isConnecting = false
+                            onConnectToggle()
+                        }
+                    } else if (isConnected) {
+                        onConnectToggle()
+                    }
                 }
-            }
+            )
 
             Spacer(modifier = Modifier.height(48.dp))
 
-            // Server info (only shown when connected)
-            if (isConnected && selectedServer != null) {
+            // Server info and connection details (only shown when connected)
+            if (isConnected) {
+                // Server selection card
+                if (selectedServer != null) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onServerClick() },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = selectedServer.flagEmoji,
+                                fontSize = 32.sp,
+                                modifier = Modifier.padding(end = 16.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = selectedServer.country,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = selectedServer.city,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = "Change server",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                } else {
+                    // Default server info when none selected
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onServerClick() },
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "🌍",
+                                fontSize = 32.sp,
+                                modifier = Modifier.padding(end = 16.dp)
+                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Auto-Selected Server",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Optimal location",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowForward,
+                                contentDescription = "Change server",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Connection duration
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onServerClick() },
+                        .padding(horizontal = 16.dp),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
@@ -156,62 +270,93 @@ fun HomeScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp),
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = selectedServer.flagEmoji,
-                            fontSize = 32.sp,
-                            modifier = Modifier.padding(end = 16.dp)
+                            text = "Duration",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                         )
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = selectedServer.country,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = selectedServer.city,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                        }
-                        Icon(
-                            imageVector = Icons.Default.ArrowForward,
-                            contentDescription = "Change server",
-                            tint = MaterialTheme.colorScheme.primary
+                        Text(
+                            text = formatDuration(connectionDuration),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Connection details
-                Card(
+                // IP Address info
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                    )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Column(
-                        modifier = Modifier.padding(20.dp)
-                    ) {
-                        Text(
-                            text = "Connection Details",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(bottom = 16.dp)
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
                         )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Your IP",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "185.243.218.27",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
 
-                        ConnectionDetailRow("Local IP", "192.168.1.100")
-                        ConnectionDetailRow("Server IP", "185.243.218.27")
-                        ConnectionDetailRow("Session Duration", "00:15:32")
-                        ConnectionDetailRow("Data Transfer", "2.4 MB ↓ / 1.1 MB ↑")
+                    Card(
+                        modifier = Modifier.weight(1f),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Data Used",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "2.4 GB",
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+fun formatDuration(durationMs: Long): String {
+    val seconds = (durationMs / 1000) % 60
+    val minutes = (durationMs / (1000 * 60)) % 60
+    val hours = (durationMs / (1000 * 60 * 60))
+
+    return if (hours > 0) {
+        String.format("%02d:%02d:%02d", hours, minutes, seconds)
+    } else {
+        String.format("%02d:%02d", minutes, seconds)
     }
 }
 
