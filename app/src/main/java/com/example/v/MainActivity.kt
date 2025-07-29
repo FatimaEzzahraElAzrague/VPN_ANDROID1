@@ -8,6 +8,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.v.navigation.AuthNavigation
+import com.example.v.navigation.VPNNavigation
 import com.example.v.ui.theme.VPNTheme
 
 class MainActivity : ComponentActivity() {

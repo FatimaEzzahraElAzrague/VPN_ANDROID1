@@ -1,4 +1,4 @@
-package com.example.v.screens
+package com.example.v.navigation
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -14,11 +14,123 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.v.models.Server
+import com.example.v.screens.*
+import com.example.v.data.ServersData
+import com.example.v.ui.theme.*
+
+@Composable
+fun VPNNavigation(
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit,
+    onSignOut: () -> Unit
+) {
+    var selectedTab by remember { mutableStateOf(0) }
+    var selectedServer by remember { mutableStateOf<Server?>(null) }
+    var showServersScreen by remember { mutableStateOf(false) }
+    val tabs = listOf("Home", "AI Analyzer", "Settings")
+    
+    if (showServersScreen) {
+        ServersScreen(
+            servers = ServersData.servers,
+            selectedServer = selectedServer,
+            isDarkTheme = isDarkTheme,
+            onThemeToggle = onThemeToggle,
+            onServerSelect = { server -> 
+                selectedServer = server
+                showServersScreen = false
+            },
+            onBackClick = { showServersScreen = false }
+        )
+    } else {
+        Scaffold(
+            bottomBar = {
+                NavigationBar(
+                    containerColor = Color.Transparent,
+                    modifier = Modifier.background(
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Transparent,
+                                if (isDarkTheme) Color(0xFF182132).copy(alpha = 0.9f) else Color(0xFFF9F9F7).copy(alpha = 0.9f)
+                            )
+                        )
+                    )
+                ) {
+                    tabs.forEachIndexed { index, title ->
+                        NavigationBarItem(
+                            icon = {
+                                Box(
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .background(
+                                            if (selectedTab == index) OrangeCrayola.copy(alpha = 0.2f) else Color.Transparent,
+                                            shape = RoundedCornerShape(8.dp)
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = when (index) {
+                                            0 -> Icons.Default.Home
+                                            1 -> Icons.Default.Analytics
+                                            2 -> Icons.Default.Settings
+                                            else -> Icons.Default.Home
+                                        },
+                                        contentDescription = title,
+                                        tint = if (selectedTab == index) OrangeCrayola else getSecondaryTextColor(),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            },
+                            label = {
+                                Text(
+                                    text = title,
+                                    color = if (selectedTab == index) OrangeCrayola else getSecondaryTextColor(),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            selected = selectedTab == index,
+                            onClick = { selectedTab = index },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = OrangeCrayola,
+                                selectedTextColor = OrangeCrayola,
+                                unselectedIconColor = getSecondaryTextColor(),
+                                unselectedTextColor = getSecondaryTextColor(),
+                                indicatorColor = Color.Transparent
+                            )
+                        )
+                    }
+                }
+            }
+        ) { paddingValues ->
+            when (selectedTab) {
+                0 -> HomeScreen(
+                    isConnected = false,
+                    selectedServer = selectedServer,
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle,
+                    onConnectToggle = { },
+                    onServerClick = { showServersScreen = true },
+                    onSettingsClick = { selectedTab = 2 }
+                )
+                1 -> AIAnalyzerScreen(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle
+                )
+                2 -> SettingsScreen(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle,
+                    onSignOut = onSignOut
+                )
+            }
+        }
+    }
+}
 
 @Composable
 private fun ServerItem(

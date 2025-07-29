@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.media3.common.util.UnstableApi
 import com.example.v.components.VideoPlayer
+import com.example.v.ui.theme.*
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,7 +59,7 @@ fun WelcomeScreen(
                 modifier = Modifier.size(120.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+                    containerColor = OrangeCrayola.copy(alpha = 0.9f)
                 )
             ) {
                 Box(
@@ -69,7 +70,7 @@ fun WelcomeScreen(
                         imageVector = Icons.Default.Security,
                         contentDescription = "VPN Shield",
                         modifier = Modifier.size(64.dp),
-                        tint = Color.White
+                        tint = LightWhite
                     )
                 }
             }
@@ -78,10 +79,10 @@ fun WelcomeScreen(
 
             // App Title
             Text(
-                text = "GhostShield VPN",
+                text = "SecureLine VPN",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = Color.White
+                color = LightWhite
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -90,7 +91,7 @@ fun WelcomeScreen(
             Text(
                 text = "Secure, Fast & Private\nInternet Connection",
                 style = MaterialTheme.typography.titleMedium,
-                color = Color.White.copy(alpha = 0.9f),
+                color = LightWhite.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
                 lineHeight = 24.sp
             )
@@ -98,46 +99,18 @@ fun WelcomeScreen(
             Spacer(modifier = Modifier.height(130.dp))
 
             // Sign Up Button
-            Button(
+            PrimaryButton(
                 onClick = onSignUpClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-                )
-            ) {
-                Text(
-                    text = "Get Started",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-            }
+                text = "Get Started"
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Sign In Button
-            OutlinedButton(
+            SecondaryButton(
                 onClick = onSignInClick,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                border = ButtonDefaults.outlinedButtonBorder.copy(
-                    width = 2.dp
-                ),
-                colors = ButtonDefaults.outlinedButtonColors(
-                    contentColor = Color.White
-                )
-            ) {
-                Text(
-                    text = "I Already Have an Account",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Medium
-                )
-            }
+                text = "I Already Have an Account"
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 
@@ -145,7 +118,7 @@ fun WelcomeScreen(
             Text(
                 text = "By continuing, you agree to our Terms of Service\nand Privacy Policy",
                 style = MaterialTheme.typography.bodySmall,
-                color = Color.White.copy(alpha = 0.7f),
+                color = LightWhite.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
                 lineHeight = 18.sp
             )
@@ -163,12 +136,12 @@ private fun FeatureItem(icon: String, text: String) {
             text = icon,
             fontSize = 24.sp,
             modifier = Modifier.padding(end = 16.dp),
-            color = Color.White
+            color = LightWhite
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
-            color = Color.White.copy(alpha = 0.9f)
+            color = LightWhite.copy(alpha = 0.9f)
         )
     }
 }

@@ -28,23 +28,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.v.models.Server
+import com.example.v.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-// Theme Colors
-val LightCharcoal = Color(0xFF4A5161)
-val LightCadetGray = Color(0xFF979EAE)
-val LightSeasalt = Color(0xFFF9F9F7)
-val LightOrangeCrayola = Color(0xFFFF6C36)
-val LightWhite = Color(0xFFFFFFFF)
+// Theme Colors - moved to Colors.kt
+// val LightCharcoal = Color(0xFF4A5161)
+// val LightCadetGray = Color(0xFF979EAE)
+// val LightSeasalt = Color(0xFFF9F9F7)
+// val LightOrangeCrayola = Color(0xFFFF6C36)
+// val LightWhite = Color(0xFFFFFFFF)
 
-val DarkBlack = Color(0xFF090909)
-val DarkOxfordBlue = Color(0xFF182132)
-val DarkGunmetal = Color(0xFF2B3440)
-val DarkOrangeCrayola = Color(0xFFFF6C36)
-val DarkGunmetalSecondary = Color(0xFF1F2838)
+// val DarkBlack = Color(0xFF090909)
+// val DarkOxfordBlue = Color(0xFF182132)
+// val DarkGunmetal = Color(0xFF2B3440)
+// val DarkOrangeCrayola = Color(0xFFFF6C36)
+// val DarkGunmetalSecondary = Color(0xFF1F2838)
 
-val OrangeCrayola = Color(0xFFFF6C36)
+// val OrangeCrayola = Color(0xFFFF6C36)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,36 +86,10 @@ fun HomeScreen(
         }
     }
 
-    val gradientColors = if (isDarkTheme) {
-        listOf(
-            DarkBlack,
-            DarkOxfordBlue,
-            DarkGunmetal,
-            DarkOxfordBlue,
-            DarkBlack
-        )
-    } else {
-        listOf(
-            LightSeasalt,
-            LightWhite,
-            LightSeasalt
-        )
-    }
-
-    val primaryTextColor = if (isDarkTheme) LightWhite else LightCharcoal
-    val secondaryTextColor = if (isDarkTheme) LightCadetGray else LightCadetGray
-    val cardBackgroundColor = if (isDarkTheme) DarkGunmetalSecondary else LightWhite
-    val circleColor = if (isDarkTheme) DarkGunmetal else LightCadetGray
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.radialGradient(
-                    colors = gradientColors,
-                    radius = 1200f
-                )
-            )
+            .background(getGradientBackground(isDarkTheme))
     ) {
         Column(
             modifier = Modifier
@@ -134,30 +109,15 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Theme toggle button
-                IconButton(
-                    onClick = onThemeToggle,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = if (isDarkTheme) DarkGunmetalSecondary else LightWhite,
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = "Toggle theme",
-                        tint = primaryTextColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                ThemeToggleButton(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle
+                )
 
                 // App title
-                Text(
+                TitleText(
                     text = "SecureLine VPN",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = primaryTextColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp
+                    isDarkTheme = isDarkTheme
                 )
 
                 // Spacer to balance the layout
@@ -171,6 +131,10 @@ fun HomeScreen(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier.size(300.dp)
             ) {
+                // Store colors in variables to avoid @Composable calls in Canvas
+                val circleColor = getCircleColor(isDarkTheme)
+                val orangeColor = getOrangeColor()
+                
                 // Background circles for depth
                 repeat(3) { index ->
                     Canvas(
@@ -213,7 +177,7 @@ fun HomeScreen(
                     if (isConnected || isConnecting) {
                         val sweepAngle = if (isConnecting) 90f else 360f
                         drawArc(
-                            color = OrangeCrayola,
+                            color = orangeColor,
                             startAngle = -90f,
                             sweepAngle = sweepAngle,
                             useCenter = false,
@@ -238,9 +202,9 @@ fun HomeScreen(
                         },
                         style = MaterialTheme.typography.titleLarge,
                         color = when {
-                            isConnected -> OrangeCrayola
-                            isConnecting -> OrangeCrayola
-                            else -> primaryTextColor
+                            isConnected -> orangeColor
+                            isConnecting -> orangeColor
+                            else -> getPrimaryTextColor(isDarkTheme)
                         },
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -252,7 +216,7 @@ fun HomeScreen(
                         Text(
                             text = formatDuration(connectionDuration),
                             style = MaterialTheme.typography.titleMedium,
-                            color = secondaryTextColor,
+                            color = getSecondaryTextColor(),
                             textAlign = TextAlign.Center,
                             fontSize = 16.sp
                         )
@@ -313,25 +277,20 @@ fun HomeScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 40.dp)
+                    .padding(bottom = 80.dp) // Increased padding to avoid nav bar
             ) {
                 Text(
                     text = "Server location",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = secondaryTextColor,
+                    color = getSecondaryTextColor(),
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
                 // Server selection card
-                Card(
+                StyledCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable { onServerClick() },
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = cardBackgroundColor.copy(alpha = 0.9f)
-                    ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        .clickable { onServerClick() }
                 ) {
                     Row(
                         modifier = Modifier
@@ -347,7 +306,7 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .size(32.dp)
                                     .background(
-                                        OrangeCrayola.copy(alpha = 0.2f),
+                                        if (isDarkTheme) OrangeCrayola.copy(alpha = 0.2f) else getOrangeColor().copy(alpha = 0.2f),
                                         CircleShape
                                     ),
                                 contentAlignment = Alignment.Center
@@ -355,7 +314,7 @@ fun HomeScreen(
                                 Icon(
                                     imageVector = Icons.Default.FlashOn,
                                     contentDescription = "Lightning",
-                                    tint = OrangeCrayola,
+                                    tint = if (isDarkTheme) OrangeCrayola else getOrangeColor(),
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -367,7 +326,7 @@ fun HomeScreen(
                                     "${it.country}, ${it.city}"
                                 } ?: "Optimal Location",
                                 style = MaterialTheme.typography.titleMedium,
-                                color = primaryTextColor,
+                                color = getPrimaryTextColor(isDarkTheme),
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 16.sp
                             )
@@ -376,7 +335,7 @@ fun HomeScreen(
                         Icon(
                             imageVector = Icons.Default.ArrowDropUp,
                             contentDescription = "Expand",
-                            tint = primaryTextColor,
+                            tint = if (isDarkTheme) OrangeCrayola else getPrimaryTextColor(isDarkTheme),
                             modifier = Modifier.size(28.dp)
                         )
                     }

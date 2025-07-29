@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.v.components.GoogleSignInButton
+import com.example.v.ui.theme.*
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -40,21 +41,7 @@ fun SignInScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = if (isDarkTheme) {
-                        listOf(
-                            Color(0xFF1A1A2E),
-                            Color(0xFF16213E)
-                        )
-                    } else {
-                        listOf(
-                            Color(0xFFF0F4F8),
-                            Color(0xFFE2E8F0)
-                        )
-                    }
-                )
-            )
+            .background(getGradientBackground(isDarkTheme))
     ) {
         // Back button
         IconButton(
@@ -66,23 +53,18 @@ fun SignInScreen(
             Icon(
                 imageVector = Icons.Default.ArrowBack,
                 contentDescription = "Back",
-                tint = MaterialTheme.colorScheme.onBackground
+                tint = getPrimaryTextColor(isDarkTheme)
             )
         }
 
         // Theme toggle button
-        IconButton(
-            onClick = onThemeToggle,
+        ThemeToggleButton(
+            isDarkTheme = isDarkTheme,
+            onThemeToggle = onThemeToggle,
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                contentDescription = "Toggle theme",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
+        )
 
         Column(
             modifier = Modifier
@@ -92,19 +74,16 @@ fun SignInScreen(
             verticalArrangement = Arrangement.Center
         ) {
             // Title
-            Text(
+            TitleText(
                 text = "Welcome Back",
-                style = MaterialTheme.typography.headlineLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                isDarkTheme = isDarkTheme
             )
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
+            SubtitleText(
                 text = "Sign in to your account",
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                isDarkTheme = isDarkTheme
             )
 
             Spacer(modifier = Modifier.height(48.dp))
@@ -123,7 +102,14 @@ fun SignInScreen(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = OrangeCrayola,
+                    unfocusedBorderColor = getSecondaryTextColor(),
+                    focusedLabelColor = OrangeCrayola,
+                    unfocusedLabelColor = getSecondaryTextColor(),
+                    cursorColor = OrangeCrayola
+                )
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -151,7 +137,14 @@ fun SignInScreen(
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 singleLine = true,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = OrangeCrayola,
+                    unfocusedBorderColor = getSecondaryTextColor(),
+                    focusedLabelColor = OrangeCrayola,
+                    unfocusedLabelColor = getSecondaryTextColor(),
+                    cursorColor = OrangeCrayola
+                )
             )
 
             // Forgot password
@@ -163,7 +156,7 @@ fun SignInScreen(
             ) {
                 Text(
                     text = "Forgot Password?",
-                    color = MaterialTheme.colorScheme.primary,
+                    color = OrangeCrayola,
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.clickable { /* Handle forgot password */ }
                 )
@@ -183,11 +176,11 @@ fun SignInScreen(
             Spacer(modifier = Modifier.height(32.dp))
 
             // Sign In Button
-            Button(
+            PrimaryButton(
                 onClick = {
                     if (email.isBlank() || password.isBlank()) {
                         errorMessage = "Please fill in all fields"
-                        return@Button
+                        return@PrimaryButton
                     }
                     isLoading = true
                     // Simulate API call
@@ -197,26 +190,9 @@ fun SignInScreen(
                         onSignInSuccess()
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp),
-                shape = RoundedCornerShape(16.dp),
-                enabled = !isLoading
-            ) {
-                if (isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                } else {
-                    Text(
-                        text = "Sign In",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
+                text = "Sign In",
+                isLoading = isLoading
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -225,13 +201,19 @@ fun SignInScreen(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Divider(modifier = Modifier.weight(1f))
+                Divider(
+                    modifier = Modifier.weight(1f),
+                    color = getSecondaryTextColor()
+                )
                 Text(
                     text = "  OR  ",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    color = getSecondaryTextColor(),
                     style = MaterialTheme.typography.bodyMedium
                 )
-                Divider(modifier = Modifier.weight(1f))
+                Divider(
+                    modifier = Modifier.weight(1f),
+                    color = getSecondaryTextColor()
+                )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -256,12 +238,12 @@ fun SignInScreen(
             Row {
                 Text(
                     text = "Don't have an account? ",
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                    color = getSecondaryTextColor(),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 Text(
                     text = "Sign Up",
-                    color = MaterialTheme.colorScheme.primary,
+                    color = OrangeCrayola,
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onSignUpClick() }

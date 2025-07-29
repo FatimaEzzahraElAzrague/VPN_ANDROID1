@@ -11,52 +11,33 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.dp
 import com.example.v.screens.TrafficData
-import com.example.v.ui.theme.VPNTheme
+import com.example.v.ui.theme.*
 
 @Composable
 fun TrafficChart(
     trafficData: List<TrafficData>,
+    isDarkTheme: Boolean,
     modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = modifier.height(200.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = VPNTheme.DarkCardBackground
-        )
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp)
+    if (trafficData.isNotEmpty()) {
+        Canvas(
+            modifier = modifier
+                .fillMaxWidth()
+                .height(120.dp)
         ) {
-            Text(
-                text = "Traffic Analysis",
-                style = MaterialTheme.typography.titleMedium,
-                color = VPNTheme.DarkTextPrimary
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            if (trafficData.isNotEmpty()) {
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(120.dp)
-                ) {
-                    drawTrafficChart(trafficData)
-                }
-            } else {
-                Text(
-                    text = "No data available",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = VPNTheme.DarkTextSecondary
-                )
-            }
+            drawTrafficChart(trafficData, isDarkTheme)
         }
+    } else {
+        Text(
+            text = "No data available",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color(0xFF979EAE), // Secondary text color
+            modifier = modifier
+        )
     }
 }
 
-fun DrawScope.drawTrafficChart(trafficData: List<TrafficData>) {
+private fun DrawScope.drawTrafficChart(trafficData: List<TrafficData>, isDarkTheme: Boolean) {
     if (trafficData.isEmpty()) return
     
     val width = size.width
@@ -72,8 +53,8 @@ fun DrawScope.drawTrafficChart(trafficData: List<TrafficData>) {
     
     if (maxBytes == minBytes) return
     
-    // Draw grid lines
-    val gridColor = VPNTheme.DarkTextSecondary.copy(alpha = 0.2f)
+    // Draw grid lines - use hardcoded colors instead of @Composable functions
+    val gridColor = if (isDarkTheme) Color(0xFF979EAE).copy(alpha = 0.2f) else Color(0xFF979EAE).copy(alpha = 0.2f)
     for (i in 0..4) {
         val y = padding + (chartHeight / 4) * i
         drawLine(
@@ -84,10 +65,10 @@ fun DrawScope.drawTrafficChart(trafficData: List<TrafficData>) {
         )
     }
     
-    // Draw data points and lines
+    // Draw data points and lines - use hardcoded colors instead of @Composable functions
     val pointRadius = 3f
-    val lineColor = VPNTheme.DarkPrimary
-    val pointColor = VPNTheme.DarkPrimary
+    val lineColor = Color(0xFFFF6C36) // OrangeCrayola
+    val pointColor = Color(0xFFFF6C36) // OrangeCrayola
     
     val path = Path()
     var isFirst = true

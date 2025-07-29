@@ -1,85 +1,68 @@
 package com.example.v.screens
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.v.data.ServersData
 import com.example.v.models.Server
+import com.example.v.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServersScreen(
-    servers: List<Server>,
-    selectedServer: Server?,
+    servers: List<Server> = ServersData.servers,
+    selectedServer: Server? = null,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
     onServerSelect: (Server) -> Unit,
     onBackClick: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-
-    val filteredServers = remember(servers, searchQuery) {
-        if (searchQuery.isEmpty()) {
-            servers
-        } else {
-            servers.filter { server ->
-                server.country.contains(searchQuery, ignoreCase = true) ||
-                        server.city.contains(searchQuery, ignoreCase = true)
+    var selectedRegion by remember { mutableStateOf("All") }
+    
+    val regions = listOf("All", "US", "Europe", "Asia Pacific", "Canada", "Middle East", "Africa", "South America", "Mexico", "Israel")
+    
+    val filteredServers = remember(servers, searchQuery, selectedRegion) {
+        servers.filter { server ->
+            val matchesSearch = server.country.contains(searchQuery, ignoreCase = true) ||
+                    server.city.contains(searchQuery, ignoreCase = true)
+            
+            val matchesRegion = when (selectedRegion) {
+                "All" -> true
+                "US" -> server.id.startsWith("us-")
+                "Europe" -> server.id.startsWith("eu-")
+                "Asia Pacific" -> server.id.startsWith("ap-")
+                "Canada" -> server.id.startsWith("ca-")
+                "Middle East" -> server.id.startsWith("me-")
+                "Africa" -> server.id.startsWith("af-")
+                "South America" -> server.id.startsWith("sa-")
+                "Mexico" -> server.id.startsWith("mx-")
+                "Israel" -> server.id.startsWith("il-")
+                else -> true
             }
+            
+            matchesSearch && matchesRegion
         }
     }
-
-    // Theme colors - using the same colors as your HomeScreen
-    val gradientColors = if (isDarkTheme) {
-        listOf(
-            Color(0xFF090909), // DarkBlack
-            Color(0xFF182132), // DarkOxfordBlue
-            Color(0xFF2B3440), // DarkGunmetal
-            Color(0xFF182132), // DarkOxfordBlue
-            Color(0xFF090909)  // DarkBlack
-        )
-    } else {
-        listOf(
-            Color(0xFFF9F9F7), // LightSeasalt
-            Color(0xFFFFFFFF), // LightWhite
-            Color(0xFFF9F9F7)  // LightSeasalt
-        )
-    }
-
-    val primaryTextColor = if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFF4A5161)
-    val secondaryTextColor = Color(0xFF979EAE)
-    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1F2838) else Color(0xFFFFFFFF)
-    val searchBackgroundColor = if (isDarkTheme) Color(0xFF2B3440) else Color(0xFFFFFFFF)
-    val orangeColor = Color(0xFFFF6C36)
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                brush = Brush.radialGradient(
-                    colors = gradientColors,
-                    radius = 1200f
-                )
-            )
+            .background(getGradientBackground(isDarkTheme))
     ) {
         Column(
             modifier = Modifier
@@ -100,109 +83,109 @@ fun ServersScreen(
                 // Back button
                 IconButton(
                     onClick = onBackClick,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = if (isDarkTheme) Color(0xFF1F2838) else Color(0xFFFFFFFF),
-                            shape = CircleShape
-                        )
+                    modifier = Modifier.size(48.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = primaryTextColor,
-                        modifier = Modifier.size(24.dp)
+                        tint = getPrimaryTextColor(isDarkTheme)
                     )
                 }
 
                 // Title
-                Text(
-                    text = "Server Locations",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = primaryTextColor,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 22.sp
+                TitleText(
+                    text = "Servers",
+                    isDarkTheme = isDarkTheme
                 )
 
-                // Theme toggle button
-                IconButton(
-                    onClick = onThemeToggle,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .background(
-                            color = if (isDarkTheme) Color(0xFF1F2838) else Color(0xFFFFFFFF),
-                            shape = CircleShape
-                        )
-                ) {
-                    Icon(
-                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                        contentDescription = "Toggle theme",
-                        tint = primaryTextColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                // Theme toggle
+                ThemeToggleButton(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle
+                )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
-
             // Search bar
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = searchBackgroundColor.copy(alpha = 0.9f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                placeholder = {
+                    Text(
+                        text = "Search servers...",
+                        color = getSecondaryTextColor()
+                    )
+                },
+                leadingIcon = {
                     Icon(
                         imageVector = Icons.Default.Search,
                         contentDescription = "Search",
-                        tint = secondaryTextColor,
-                        modifier = Modifier.size(24.dp)
+                        tint = getSecondaryTextColor()
                     )
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = OrangeCrayola,
+                    unfocusedBorderColor = getSecondaryTextColor(),
+                    focusedLabelColor = OrangeCrayola,
+                    unfocusedLabelColor = getSecondaryTextColor(),
+                    cursorColor = OrangeCrayola
+                ),
+                shape = RoundedCornerShape(16.dp)
+            )
 
-                    Spacer(modifier = Modifier.width(12.dp))
+            // Quick Connect Button
+            PrimaryButton(
+                onClick = {
+                    val optimalServer = ServersData.getOptimalServer()
+                    if (optimalServer != null) {
+                        onServerSelect(optimalServer)
+                    }
+                },
+                text = "Quick Connect to Fastest Server",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+                icon = Icons.Default.FlashOn
+            )
 
-                    BasicTextField(
-                        value = searchQuery,
-                        onValueChange = { searchQuery = it },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        textStyle = LocalTextStyle.current.copy(
-                            color = primaryTextColor,
-                            fontSize = 16.sp
-                        ),
-                        decorationBox = { innerTextField ->
-                            if (searchQuery.isEmpty()) {
-                                Text(
-                                    text = "Search countries or cities...",
-                                    color = secondaryTextColor,
-                                    fontSize = 16.sp
-                                )
-                            }
-                            innerTextField()
-                        }
+            // Region filter
+            LazyRow(
+                modifier = Modifier.padding(vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(regions) { region ->
+                    FilterChip(
+                        onClick = { selectedRegion = region },
+                        label = { Text(region) },
+                        selected = selectedRegion == region,
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = OrangeCrayola,
+                            selectedLabelColor = LightWhite
+                        )
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Server count
+            Text(
+                text = "${filteredServers.size} servers available",
+                style = MaterialTheme.typography.bodyMedium,
+                color = getSecondaryTextColor(),
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
 
             // Server list
             LazyColumn(
+                modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(bottom = 24.dp)
+                contentPadding = PaddingValues(vertical = 16.dp)
             ) {
                 items(filteredServers) { server ->
                     ServerItem(
                         server = server,
-                        isSelected = server.id == selectedServer?.id,
+                        isSelected = selectedServer?.id == server.id,
                         isDarkTheme = isDarkTheme,
                         onServerClick = { onServerSelect(server) }
                     )
@@ -219,166 +202,142 @@ private fun ServerItem(
     isDarkTheme: Boolean,
     onServerClick: () -> Unit
 ) {
-    val primaryTextColor = if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFF4A5161)
-    val secondaryTextColor = Color(0xFF979EAE)
-    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1F2838) else Color(0xFFFFFFFF)
-    val orangeColor = Color(0xFFFF6C36)
-
-    val animatedScale by animateFloatAsState(
-        targetValue = if (isSelected) 1.05f else 1f,
-        animationSpec = tween(300),
-        label = "scale"
-    )
-
-    val animatedBackgroundColor by animateColorAsState(
-        targetValue = if (isSelected) orangeColor.copy(alpha = 0.1f) else Color.Transparent,
-        animationSpec = tween(300),
-        label = "background"
-    )
-
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .scale(animatedScale)
             .clickable { onServerClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = cardBackgroundColor.copy(alpha = 0.9f)
+            containerColor = getCardBackgroundColor(isDarkTheme).copy(alpha = 0.9f)
         ),
         elevation = CardDefaults.cardElevation(
             defaultElevation = if (isSelected) 8.dp else 4.dp
         )
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(animatedBackgroundColor)
+                .padding(20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
+                modifier = Modifier.weight(1f)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    // Country flag
-                    Text(
-                        text = server.flag,
-                        fontSize = 32.sp,
-                        modifier = Modifier.size(40.dp)
-                    )
+                // Country flag
+                Text(
+                    text = server.flag,
+                    fontSize = 32.sp,
+                    modifier = Modifier.size(40.dp)
+                )
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                Spacer(modifier = Modifier.width(16.dp))
 
-                    Column {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = server.country,
-                                style = MaterialTheme.typography.titleMedium,
-                                color = primaryTextColor,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 16.sp
-                            )
-
-                            if (server.isOptimal == true) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            orangeColor.copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "OPTIMAL",
-                                        fontSize = 10.sp,
-                                        color = orangeColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-
-                            if (server.isPremium == true) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            Color(0xFFFFD700).copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "PREMIUM",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFFFFD700),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
-                        }
-
-                        Text(
-                            text = server.city,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = secondaryTextColor,
-                            fontSize = 14.sp
-                        )
-                    }
-                }
-
-                // Server stats
-                Column(
-                    horizontalAlignment = Alignment.End
-                ) {
-                    // Ping indicator
+                Column {
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        SignalStrengthIndicator(
-                            strength = getPingStrength(server.ping),
-                            color = getPingColor(server.ping)
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
                         Text(
-                            text = "${server.ping}ms",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = getPingColor(server.ping),
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 12.sp
+                            text = server.country,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = getPrimaryTextColor(isDarkTheme),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 16.sp
                         )
+
+                        if (server.isOptimal) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = OrangeCrayola.copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Optimal",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = OrangeCrayola,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+
+                        if (server.isPremium) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = Color(0xFFFFD700).copy(alpha = 0.2f),
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = "Premium",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = Color(0xFFFFD700),
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
                     }
 
-                    Spacer(modifier = Modifier.height(4.dp))
-
-                    // Load indicator
                     Text(
-                        text = "Load: ${server.load}%",
+                        text = server.city,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = getSecondaryTextColor(),
+                        fontSize = 14.sp
+                    )
+                }
+            }
+
+            // Server stats
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                // Ping indicator
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SignalStrengthIndicator(
+                        strength = getPingStrength(server.ping),
+                        color = getPingColor(server.ping)
+                    )
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Text(
+                        text = "${server.ping}ms",
                         style = MaterialTheme.typography.bodySmall,
-                        color = getLoadColor(server.load),
-                        fontSize = 11.sp
+                        color = getPingColor(server.ping),
+                        fontWeight = FontWeight.Medium,
+                        fontSize = 12.sp
                     )
                 }
 
-                // Selection indicator
-                if (isSelected) {
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Icon(
-                        imageVector = Icons.Default.CheckCircle,
-                        contentDescription = "Selected",
-                        tint = orangeColor,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Load indicator
+                Text(
+                    text = "Load: ${server.load}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = getLoadColor(server.load),
+                    fontSize = 11.sp
+                )
+            }
+
+            // Selection indicator
+            if (isSelected) {
+                Spacer(modifier = Modifier.width(16.dp))
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Selected",
+                    tint = OrangeCrayola,
+                    modifier = Modifier.size(24.dp)
+                )
             }
         }
     }

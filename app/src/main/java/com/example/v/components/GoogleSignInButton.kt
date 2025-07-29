@@ -13,6 +13,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.v.ui.theme.*
 
 @Composable
 fun GoogleSignInButton(
@@ -28,12 +29,12 @@ fun GoogleSignInButton(
         shape = RoundedCornerShape(16.dp),
         enabled = enabled,
         colors = ButtonDefaults.outlinedButtonColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            contentColor = MaterialTheme.colorScheme.onSurface
+            containerColor = LightWhite,
+            contentColor = LightCharcoal
         ),
         border = ButtonDefaults.outlinedButtonBorder.copy(
             width = 1.dp,
-            brush = SolidColor(Color.Gray)
+            brush = SolidColor(getSecondaryTextColor())
         )
     ) {
         Row(
@@ -46,7 +47,7 @@ fun GoogleSignInButton(
                     .size(24.dp)
                     .border(
                         width = 1.dp,
-                        color = MaterialTheme.colorScheme.outline,
+                        color = getSecondaryTextColor(),
                         shape = RoundedCornerShape(4.dp)
                     ),
                 contentAlignment = Alignment.Center
@@ -55,7 +56,7 @@ fun GoogleSignInButton(
                     text = "G",
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = getOrangeColor()
                 )
             }
 
