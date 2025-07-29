@@ -2,16 +2,19 @@ package com.example.v.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
+// Light Theme Colors
+val LightCharcoal = Color(0xFF4A5161)
+val LightCadetGray = Color(0xFF979EAE)
+val LightSeasalt = Color(0xFFF9F9F7)
+val LightOrangeCrayola = Color(0xFFFF6C36)
+val LightWhite = Color(0xFFFFFFFF)
 
-val Purple40 = Color(0xFF6650a4)
-val PurpleGrey40 = Color(0xFF625b71)
-val Pink40 = Color(0xFF7D5260)
+// Dark Theme Colors
+val DarkBlack = Color(0xFF090909)
+val DarkOxfordBlue = Color(0xFF182132)
+val DarkGunmetal = Color(0xFF2B3440)
+val DarkOrangeCrayola = Color(0xFFFF6C36) // Same as light mode
+val DarkGunmetalSecondary = Color(0xFF1F2838)
 
-val Orange = Color(0xFFFF6B35)
-val Green = Color(0xFF4CAF50)
-val Blue = Color(0xFF2196F3)
-val DarkBackground = Color(0xFF1A1A2E)
-val DarkSurface = Color(0xFF2A2A3E)
+// Common colors (used in both themes)
+val OrangeCrayola = Color(0xFFFF6C36)

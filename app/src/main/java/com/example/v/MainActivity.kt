@@ -1,3 +1,4 @@
+// MainActivity.kt
 package com.example.v
 
 import android.os.Bundle
@@ -6,7 +7,8 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.v.ui.theme.VPNAppTheme
+import com.example.v.navigation.AuthNavigation
+import com.example.v.ui.theme.VPNTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,7 +26,7 @@ fun VPNApp() {
     val systemDarkTheme = isSystemInDarkTheme()
     val actualDarkTheme = isDarkTheme ?: systemDarkTheme
 
-    VPNAppTheme(darkTheme = actualDarkTheme) {
+    VPNTheme(darkTheme = actualDarkTheme) {
         if (isAuthenticated) {
             VPNNavigation(
                 isDarkTheme = actualDarkTheme,

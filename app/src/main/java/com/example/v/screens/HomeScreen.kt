@@ -8,30 +8,43 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowForward
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Power
-import androidx.compose.material.icons.filled.Security
-import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.v.models.Server
-import com.example.v.components.AnimatedConnectButton
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.sin
+
+// Theme Colors
+val LightCharcoal = Color(0xFF4A5161)
+val LightCadetGray = Color(0xFF979EAE)
+val LightSeasalt = Color(0xFFF9F9F7)
+val LightOrangeCrayola = Color(0xFFFF6C36)
+val LightWhite = Color(0xFFFFFFFF)
+
+val DarkBlack = Color(0xFF090909)
+val DarkOxfordBlue = Color(0xFF182132)
+val DarkGunmetal = Color(0xFF2B3440)
+val DarkOrangeCrayola = Color(0xFFFF6C36)
+val DarkGunmetalSecondary = Color(0xFF1F2838)
+
+val OrangeCrayola = Color(0xFFFF6C36)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,306 +54,331 @@ fun HomeScreen(
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
     onConnectToggle: () -> Unit,
-    onServerClick: () -> Unit
+    onServerClick: () -> Unit,
+    onSettingsClick: () -> Unit = {}
 ) {
     var isConnecting by remember { mutableStateOf(false) }
     var connectionDuration by remember { mutableStateOf(0L) }
+    val scope = rememberCoroutineScope()
 
-    // Timer for connection duration
+    // Animation for connecting state
+    val infiniteTransition = rememberInfiniteTransition(label = "connecting")
+    val rotationAngle by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    // Connection duration timer
     LaunchedEffect(isConnected) {
         if (isConnected) {
             val startTime = System.currentTimeMillis()
             while (isConnected) {
                 connectionDuration = System.currentTimeMillis() - startTime
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
             }
-        } else {
             connectionDuration = 0L
         }
     }
+
+    val gradientColors = if (isDarkTheme) {
+        listOf(
+            DarkBlack,
+            DarkOxfordBlue,
+            DarkGunmetal,
+            DarkOxfordBlue,
+            DarkBlack
+        )
+    } else {
+        listOf(
+            LightSeasalt,
+            LightWhite,
+            LightSeasalt
+        )
+    }
+
+    val primaryTextColor = if (isDarkTheme) LightWhite else LightCharcoal
+    val secondaryTextColor = if (isDarkTheme) LightCadetGray else LightCadetGray
+    val cardBackgroundColor = if (isDarkTheme) DarkGunmetalSecondary else LightWhite
+    val circleColor = if (isDarkTheme) DarkGunmetal else LightCadetGray
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                brush = Brush.verticalGradient(
-                    colors = if (isDarkTheme) {
-                        listOf(
-                            Color(0xFF1A1A2E),
-                            Color(0xFF16213E)
-                        )
-                    } else {
-                        listOf(
-                            Color(0xFFF0F4F8),
-                            Color(0xFFE2E8F0)
-                        )
-                    }
+                brush = Brush.radialGradient(
+                    colors = gradientColors,
+                    radius = 1200f
                 )
             )
     ) {
-        // World map background
-        WorldMapBackground(isDarkTheme = isDarkTheme)
-
-        // Theme toggle button
-        IconButton(
-            onClick = onThemeToggle,
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                contentDescription = "Toggle theme",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+                .padding(horizontal = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // VPN Status
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (isConnected) {
-                        Color(0xFF4CAF50).copy(alpha = 0.1f)
-                    } else {
-                        Color(0xFFFF6B35).copy(alpha = 0.1f)
-                    }
-                )
+            // Status bar spacer
+            Spacer(modifier = Modifier.height(40.dp))
+
+            // Top bar with theme toggle and title
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(
+                // Theme toggle button
+                IconButton(
+                    onClick = onThemeToggle,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
+                        .size(48.dp)
+                        .background(
+                            color = if (isDarkTheme) DarkGunmetalSecondary else LightWhite,
+                            shape = CircleShape
+                        )
                 ) {
                     Icon(
-                        imageVector = if (isConnected) Icons.Default.Security else Icons.Default.Warning,
-                        contentDescription = null,
-                        tint = if (isConnected) Color(0xFF4CAF50) else Color(0xFFFF6B35),
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = "Toggle theme",
+                        tint = primaryTextColor,
                         modifier = Modifier.size(24.dp)
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                }
+
+                // App title
+                Text(
+                    text = "SecureLine VPN",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = primaryTextColor,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 22.sp
+                )
+
+                // Spacer to balance the layout
+                Spacer(modifier = Modifier.size(48.dp))
+            }
+
+            Spacer(modifier = Modifier.height(60.dp))
+
+            // Main connection circle
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier.size(300.dp)
+            ) {
+                // Background circles for depth
+                repeat(3) { index ->
+                    Canvas(
+                        modifier = Modifier.size(300.dp - (index * 40).dp)
+                    ) {
+                        val centerX = size.width / 2
+                        val centerY = size.height / 2
+                        val radius = size.minDimension / 2 - 10.dp.toPx()
+
+                        drawCircle(
+                            color = circleColor.copy(alpha = 0.3f - (index * 0.1f)),
+                            radius = radius,
+                            center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                            style = Stroke(width = 2.dp.toPx())
+                        )
+                    }
+                }
+
+                // Main connection circle
+                Canvas(
+                    modifier = Modifier
+                        .size(250.dp)
+                        .then(
+                            if (isConnecting) Modifier.rotate(rotationAngle) else Modifier
+                        )
+                ) {
+                    val centerX = size.width / 2
+                    val centerY = size.height / 2
+                    val radius = size.minDimension / 2 - 15.dp.toPx()
+
+                    // Outer ring
+                    drawCircle(
+                        color = circleColor,
+                        radius = radius,
+                        center = androidx.compose.ui.geometry.Offset(centerX, centerY),
+                        style = Stroke(width = 4.dp.toPx())
+                    )
+
+                    // Progress ring
+                    if (isConnected || isConnecting) {
+                        val sweepAngle = if (isConnecting) 90f else 360f
+                        drawArc(
+                            color = OrangeCrayola,
+                            startAngle = -90f,
+                            sweepAngle = sweepAngle,
+                            useCenter = false,
+                            style = Stroke(
+                                width = 6.dp.toPx(),
+                                cap = StrokeCap.Round
+                            )
+                        )
+                    }
+                }
+
+                // Center content
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
                     Text(
-                        text = if (isConnected) "SECURE" else "NOT SECURE",
-                        style = MaterialTheme.typography.titleMedium,
+                        text = when {
+                            isConnecting -> "CONNECTING"
+                            isConnected -> "CONNECTED"
+                            else -> "TAP TO CONNECT"
+                        },
+                        style = MaterialTheme.typography.titleLarge,
+                        color = when {
+                            isConnected -> OrangeCrayola
+                            isConnecting -> OrangeCrayola
+                            else -> primaryTextColor
+                        },
                         fontWeight = FontWeight.Bold,
-                        color = if (isConnected) Color(0xFF4CAF50) else Color(0xFFFF6B35)
+                        textAlign = TextAlign.Center,
+                        fontSize = 18.sp
+                    )
+
+                    if (isConnected) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = formatDuration(connectionDuration),
+                            style = MaterialTheme.typography.titleMedium,
+                            color = secondaryTextColor,
+                            textAlign = TextAlign.Center,
+                            fontSize = 16.sp
+                        )
+                    }
+                }
+
+                // Connect/Disconnect button
+                if (!isConnecting) {
+                    FloatingActionButton(
+                        onClick = {
+                            if (isConnected) {
+                                onConnectToggle()
+                            } else {
+                                isConnecting = true
+                                scope.launch {
+                                    delay(3000)
+                                    isConnecting = false
+                                    onConnectToggle()
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .size(if (isConnected) 56.dp else 0.dp)
+                            .offset(x = 80.dp, y = 80.dp),
+                        containerColor = LightWhite,
+                        contentColor = LightCharcoal
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = if (isConnected) "Disconnect" else "Connect",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Tap area for connection when disconnected
+                if (!isConnected && !isConnecting) {
+                    Box(
+                        modifier = Modifier
+                            .size(200.dp)
+                            .clip(CircleShape)
+                            .clickable {
+                                isConnecting = true
+                                scope.launch {
+                                    delay(3000)
+                                    isConnecting = false
+                                    onConnectToggle()
+                                }
+                            }
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.weight(1f))
 
-            // Connection status (legacy text)
-            Text(
-                text = if (isConnected) "CONNECTED" else "DISCONNECTED",
-                style = MaterialTheme.typography.headlineSmall,
-                color = if (isConnected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.onBackground,
-                fontWeight = FontWeight.Bold
-            )
+            // Server location section
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 40.dp)
+            ) {
+                Text(
+                    text = "Server location",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = secondaryTextColor,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
 
-            Spacer(modifier = Modifier.height(32.dp))
-
-            // Animated Connect/Disconnect button
-            AnimatedConnectButton(
-                isConnected = isConnected,
-                isConnecting = isConnecting,
-                onClick = {
-                    if (!isConnected && !isConnecting) {
-                        isConnecting = true
-                        // Simulate connection delay
-                        kotlinx.coroutines.GlobalScope.launch {
-                            kotlinx.coroutines.delay(3000)
-                            isConnecting = false
-                            onConnectToggle()
-                        }
-                    } else if (isConnected) {
-                        onConnectToggle()
-                    }
-                }
-            )
-
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Server info and connection details (only shown when connected)
-            if (isConnected) {
                 // Server selection card
-                if (selectedServer != null) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onServerClick() },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = selectedServer.flagEmoji,
-                                fontSize = 32.sp,
-                                modifier = Modifier.padding(end = 16.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = selectedServer.country,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = selectedServer.city,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.Default.ArrowForward,
-                                contentDescription = "Change server",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                } else {
-                    // Default server info when none selected
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onServerClick() },
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(20.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "🌍",
-                                fontSize = 32.sp,
-                                modifier = Modifier.padding(end = 16.dp)
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "Auto-Selected Server",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Optimal location",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                )
-                            }
-                            Icon(
-                                imageVector = Icons.Default.ArrowForward,
-                                contentDescription = "Change server",
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Connection duration
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(16.dp),
+                        .clickable { onServerClick() },
+                    shape = RoundedCornerShape(28.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                    )
+                        containerColor = cardBackgroundColor.copy(alpha = 0.9f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
                 ) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(16.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(horizontal = 24.dp, vertical = 18.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Duration",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                        )
-                        Text(
-                            text = formatDuration(connectionDuration),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(24.dp))
-
-                // IP Address info
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .background(
+                                        OrangeCrayola.copy(alpha = 0.2f),
+                                        CircleShape
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.FlashOn,
+                                    contentDescription = "Lightning",
+                                    tint = OrangeCrayola,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(16.dp))
+
                             Text(
-                                text = "Your IP",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "185.243.218.27",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
+                                text = selectedServer?.let {
+                                    "${it.country}, ${it.city}"
+                                } ?: "Optimal Location",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = primaryTextColor,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 16.sp
                             )
                         }
-                    }
 
-                    Card(
-                        modifier = Modifier.weight(1f),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropUp,
+                            contentDescription = "Expand",
+                            tint = primaryTextColor,
+                            modifier = Modifier.size(28.dp)
                         )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(16.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                text = "Data Used",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                text = "2.4 GB",
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
                     }
                 }
             }
@@ -348,88 +386,10 @@ fun HomeScreen(
     }
 }
 
-fun formatDuration(durationMs: Long): String {
-    val seconds = (durationMs / 1000) % 60
-    val minutes = (durationMs / (1000 * 60)) % 60
-    val hours = (durationMs / (1000 * 60 * 60))
-
-    return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes, seconds)
-    } else {
-        String.format("%02d:%02d", minutes, seconds)
-    }
-}
-
-@Composable
-fun ConnectionDetailRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-        )
-        Text(
-            text = value,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Medium
-        )
-    }
-}
-
-@Composable
-fun WorldMapBackground(isDarkTheme: Boolean) {
-    Canvas(
-        modifier = Modifier.fillMaxSize()
-    ) {
-        drawWorldMap(isDarkTheme)
-    }
-}
-
-fun DrawScope.drawWorldMap(isDarkTheme: Boolean) {
-    val mapColor = if (isDarkTheme) Color(0xFF2A2A3E) else Color(0xFFE2E8F0)
-    val dotColor = if (isDarkTheme) Color(0xFF3A3A5E) else Color(0xFFCBD5E0)
-
-    // Draw simplified world map dots
-    val dotRadius = 2.dp.toPx()
-    val spacing = 40.dp.toPx()
-
-    for (x in 0 until (size.width / spacing).toInt()) {
-        for (y in 0 until (size.height / spacing).toInt()) {
-            val xPos = x * spacing + (spacing / 2)
-            val yPos = y * spacing + (spacing / 2)
-
-            // Create a simple world map pattern
-            if (isLandArea(xPos / size.width, yPos / size.height)) {
-                drawCircle(
-                    color = dotColor,
-                    radius = dotRadius,
-                    center = Offset(xPos, yPos)
-                )
-            }
-        }
-    }
-}
-
-fun isLandArea(x: Float, y: Float): Boolean {
-    // Simplified world map logic
-    return when {
-        // North America
-        x in 0.1f..0.35f && y in 0.2f..0.5f -> true
-        // Europe
-        x in 0.45f..0.6f && y in 0.2f..0.4f -> true
-        // Asia
-        x in 0.6f..0.9f && y in 0.15f..0.6f -> true
-        // Africa
-        x in 0.45f..0.6f && y in 0.4f..0.8f -> true
-        // South America
-        x in 0.25f..0.4f && y in 0.5f..0.9f -> true
-        // Australia
-        x in 0.75f..0.85f && y in 0.7f..0.8f -> true
-        else -> false
-    }
+private fun formatDuration(durationMs: Long): String {
+    val totalSeconds = durationMs / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
 }

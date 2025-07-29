@@ -1,6 +1,7 @@
+// app/src/main/java/com/example/v/screens/WelcomeScreen.kt
 package com.example.v.screens
 
-import androidx.compose.foundation.Image
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,56 +10,41 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.media3.common.util.UnstableApi
+import com.example.v.components.VideoPlayer
 
+@androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WelcomeScreen(
-    isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit,
     onSignInClick: () -> Unit,
     onSignUpClick: () -> Unit
 ) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                brush = Brush.verticalGradient(
-                    colors = if (isDarkTheme) {
-                        listOf(
-                            Color(0xFF1A1A2E),
-                            Color(0xFF16213E)
-                        )
-                    } else {
-                        listOf(
-                            Color(0xFFF0F4F8),
-                            Color(0xFFE2E8F0)
-                        )
-                    }
-                )
-            )
-    ) {
-        // Theme toggle button
-        IconButton(
-            onClick = onThemeToggle,
+    val context = LocalContext.current
+    val videoUri = remember { Uri.parse("android.resource://${context.packageName}/raw/background_video") }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        VideoPlayer(
+            modifier = Modifier.fillMaxSize(),
+            uri = videoUri
+        )
+
+        // Dark overlay for better text visibility
+        Box(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp)
-        ) {
-            Icon(
-                imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
-                contentDescription = "Toggle theme",
-                tint = MaterialTheme.colorScheme.onBackground
-            )
-        }
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.3f))
+        )
 
         Column(
             modifier = Modifier
@@ -72,7 +58,7 @@ fun WelcomeScreen(
                 modifier = Modifier.size(120.dp),
                 shape = RoundedCornerShape(24.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                 )
             ) {
                 Box(
@@ -95,7 +81,7 @@ fun WelcomeScreen(
                 text = "GhostShield VPN",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground
+                color = Color.White
             )
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -104,24 +90,12 @@ fun WelcomeScreen(
             Text(
                 text = "Secure, Fast & Private\nInternet Connection",
                 style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
+                color = Color.White.copy(alpha = 0.9f),
                 textAlign = TextAlign.Center,
                 lineHeight = 24.sp
             )
 
-            Spacer(modifier = Modifier.height(48.dp))
-
-            // Features
-            Column(
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                FeatureItem("🔒", "Military-grade encryption")
-                FeatureItem("🌍", "50+ server locations worldwide")
-                FeatureItem("⚡", "Ultra-fast connection speeds")
-                FeatureItem("🚫", "No logs policy")
-            }
-
-            Spacer(modifier = Modifier.height(48.dp))
+            Spacer(modifier = Modifier.height(130.dp))
 
             // Sign Up Button
             Button(
@@ -131,13 +105,14 @@ fun WelcomeScreen(
                     .height(56.dp),
                 shape = RoundedCornerShape(16.dp),
                 colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
+                    containerColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
                 )
             ) {
                 Text(
                     text = "Get Started",
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
                 )
             }
 
@@ -152,6 +127,9 @@ fun WelcomeScreen(
                 shape = RoundedCornerShape(16.dp),
                 border = ButtonDefaults.outlinedButtonBorder.copy(
                     width = 2.dp
+                ),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color.White
                 )
             ) {
                 Text(
@@ -167,7 +145,7 @@ fun WelcomeScreen(
             Text(
                 text = "By continuing, you agree to our Terms of Service\nand Privacy Policy",
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                color = Color.White.copy(alpha = 0.7f),
                 textAlign = TextAlign.Center,
                 lineHeight = 18.sp
             )
@@ -176,7 +154,7 @@ fun WelcomeScreen(
 }
 
 @Composable
-fun FeatureItem(icon: String, text: String) {
+private fun FeatureItem(icon: String, text: String) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier.fillMaxWidth()
@@ -184,12 +162,13 @@ fun FeatureItem(icon: String, text: String) {
         Text(
             text = icon,
             fontSize = 24.sp,
-            modifier = Modifier.padding(end = 16.dp)
+            modifier = Modifier.padding(end = 16.dp),
+            color = Color.White
         )
         Text(
             text = text,
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.8f)
+            color = Color.White.copy(alpha = 0.9f)
         )
     }
 }
