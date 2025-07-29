@@ -64,7 +64,14 @@ fun SettingsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -352,7 +359,14 @@ private fun AutoConnectPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -496,7 +510,14 @@ private fun KillSwitchPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -649,7 +670,14 @@ private fun SubscriptionPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -887,7 +915,14 @@ private fun SecurityPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -1015,7 +1050,14 @@ private fun SplitTunnelingPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -1172,7 +1214,14 @@ private fun SpeedTestPage(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = if (isDarkTheme)
+                        listOf(Color(0xFF1A1A1A), Color(0xFF2D2D2D))
+                    else
+                        listOf(Color(0xFFF5F5F5), Color(0xFFE8E8E8))
+                )
+            )
     ) {
         Column(
             modifier = Modifier
@@ -1300,7 +1349,12 @@ private fun SpeedTestPage(
                                     modifier = Modifier
                                         .size(120.dp)
                                         .background(
-                                            color = Color(0xFF2196F3).copy(alpha = 0.2f),
+                                            brush = Brush.radialGradient(
+                                                colors = listOf(
+                                                    Color(0xFF2196F3).copy(alpha = 0.2f),
+                                                    Color.Transparent
+                                                )
+                                            ),
                                             shape = RoundedCornerShape(16.dp)
                                         ),
                                     contentAlignment = Alignment.Center
@@ -1535,7 +1589,9 @@ private fun StepItem(
             modifier = Modifier
                 .size(24.dp)
                 .background(
-                    color = OrangeCrayola.copy(alpha = 0.2f),
+                    brush = Brush.radialGradient(
+                        colors = listOf(OrangeCrayola.copy(alpha = 0.2f), Color.Transparent)
+                    ),
                     shape = CircleShape
                 ),
             contentAlignment = Alignment.Center
