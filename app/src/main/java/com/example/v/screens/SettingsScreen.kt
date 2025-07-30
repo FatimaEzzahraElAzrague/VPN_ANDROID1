@@ -1209,12 +1209,14 @@ private fun SpeedTestPage(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(bottom = 200.dp) // Increased bottom padding to ensure speed test is touchable
+                contentPadding = PaddingValues(bottom = 24.dp) // Add bottom padding
             ) {
                 item {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 80.dp) // Add extra padding for the button
                     ) {
                         if (isRunning) {
                             // Car Engine Animation

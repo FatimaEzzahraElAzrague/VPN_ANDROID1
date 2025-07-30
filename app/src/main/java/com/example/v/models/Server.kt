@@ -8,5 +8,7 @@ data class Server(
     val ping: Int,
     val load: Int,
     val isOptimal: Boolean = false,
-    val isPremium: Boolean = false
+    val isPremium: Boolean = false,
+    val latitude: Double,
+    val longitude: Double
 )

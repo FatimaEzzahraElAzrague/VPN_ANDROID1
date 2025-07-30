@@ -79,7 +79,7 @@ fun WelcomeScreen(
 
             // App Title
             Text(
-                text = "SecureLine VPN",
+                text = "Ghostshield VPN",
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
                 color = LightWhite

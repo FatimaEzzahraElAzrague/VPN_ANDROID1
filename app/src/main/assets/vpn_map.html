@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>VPN Map</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: #f8f9fa;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+        
+        .user-marker {
+            width: 16px;
+            height: 16px;
+            background: #007bff;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .server-marker {
+            width: 20px;
+            height: 20px;
+            background: #ff6c36;
+            border-radius: 50%;
+            border: 2px solid #ffffff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+            position: relative;
+            animation: pulse 2s infinite;
+        }
+        
+        .server-marker::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 8px;
+            height: 8px;
+            background: #ffffff;
+            border-radius: 50%;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        // Initialize map with proper settings
+        var map = L.map('map', {
+            zoomControl: false,
+            attributionControl: false,
+            dragging: false,
+            touchZoom: false,
+            scrollWheelZoom: false,
+            doubleClickZoom: false,
+            boxZoom: false,
+            keyboard: false
+        }).setView([20, 0], 2);
+
+        // Light theme tile layer to match web UI
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Store marker and arc references globally
+        var userMarker, serverMarker, arcLine;
+
+        function createOrUpdateMap(userLat, userLng, serverLat, serverLng) {
+            // Clear existing markers
+            if (userMarker) map.removeLayer(userMarker);
+            if (serverMarker) map.removeLayer(serverMarker);
+            if (arcLine) map.removeLayer(arcLine);
+
+            // User marker (blue circle)
+            var userIcon = L.divIcon({
+                className: '',
+                html: '<div class="user-marker"></div>',
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+            userMarker = L.marker([userLat, userLng], { 
+                icon: userIcon,
+                title: "Your Location" 
+            }).addTo(map);
+
+            // Server marker (orange pulsing circle)
+            var serverIcon = L.divIcon({
+                className: '',
+                html: '<div class="server-marker"></div>',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            });
+            serverMarker = L.marker([serverLat, serverLng], { 
+                icon: serverIcon,
+                title: "VPN Server" 
+            }).addTo(map);
+
+            // Connection line (clean, simple)
+            var connectionPoints = [
+                [userLat, userLng],
+                [serverLat, serverLng]
+            ];
+            arcLine = L.polyline(connectionPoints, { 
+                color: '#ff6c36', 
+                weight: 2, 
+                opacity: 0.7,
+                dashArray: '5,5'
+            }).addTo(map);
+
+            // Fit map to show both locations with padding
+            map.fitBounds([[userLat, userLng], [serverLat, serverLng]], {
+                padding: [50, 50]
+            });
+        }
+
+        // Initial map setup
+        createOrUpdateMap(34.02, -6.84, 48.85, 2.35);
+
+        // Expose updateMap for Android
+        function updateMap(userLat, userLng, serverLat, serverLng) {
+            console.log('updateMap called with:', userLat, userLng, serverLat, serverLng);
+            createOrUpdateMap(userLat, userLng, serverLat, serverLng);
+        }
+    </script>
+</body>
+</html>

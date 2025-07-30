@@ -108,25 +108,32 @@ fun VPNNavigation(
                 }
             }
         ) { paddingValues ->
-            when (selectedTab) {
-                0 -> HomeScreen(
-                    isConnected = false,
-                    selectedServer = selectedServer,
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle,
-                    onConnectToggle = { },
-                    onServerClick = { showServersScreen = true },
-                    onSettingsClick = { selectedTab = 2 }
-                )
-                1 -> AIAnalyzerScreen(
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle
-                )
-                2 -> SettingsScreen(
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle,
-                    onSignOut = onSignOut
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+            ) {
+                when (selectedTab) {
+                    0 -> HomeScreen(
+                        currentServer = selectedServer ?: ServersData.getOptimalServer() ?: ServersData.servers.first(),
+                        onServerChange = { showServersScreen = true },
+                        onNavigate = { route -> 
+                            when (route) {
+                                "analyzer" -> selectedTab = 1
+                                "settings" -> selectedTab = 2
+                            }
+                        }
+                    )
+                    1 -> AIAnalyzerScreen(
+                        isDarkTheme = isDarkTheme,
+                        onThemeToggle = onThemeToggle
+                    )
+                    2 -> SettingsScreen(
+                        isDarkTheme = isDarkTheme,
+                        onThemeToggle = onThemeToggle,
+                        onSignOut = onSignOut
+                    )
+                }
             }
         }
     }

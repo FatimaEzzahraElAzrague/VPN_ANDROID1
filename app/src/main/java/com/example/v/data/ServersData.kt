@@ -13,7 +13,9 @@ object ServersData {
             ping = 25,
             load = 15,
             isOptimal = true,
-            isPremium = false
+            isPremium = false,
+            latitude = 38.95,
+            longitude = -77.46
         ),
         Server(
             id = "us-west-1",
@@ -23,7 +25,9 @@ object ServersData {
             ping = 35,
             load = 22,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 45.52,
+            longitude = -122.68
         ),
         
         // Europe Servers
@@ -35,7 +39,9 @@ object ServersData {
             ping = 45,
             load = 18,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 51.5074,
+            longitude = -0.1278
         ),
         Server(
             id = "eu-zurich-1",
@@ -45,7 +51,9 @@ object ServersData {
             ping = 42,
             load = 12,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = 47.3769,
+            longitude = 8.5417
         ),
         Server(
             id = "eu-paris-1",
@@ -55,7 +63,9 @@ object ServersData {
             ping = 38,
             load = 25,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 48.85,
+            longitude = 2.35
         ),
         Server(
             id = "eu-frankfurt-1",
@@ -65,7 +75,9 @@ object ServersData {
             ping = 40,
             load = 20,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 50.1109,
+            longitude = 8.6821
         ),
         Server(
             id = "eu-spain-1",
@@ -75,7 +87,9 @@ object ServersData {
             ping = 48,
             load = 28,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 40.4168,
+            longitude = -3.7038
         ),
         Server(
             id = "eu-milan-1",
@@ -85,7 +99,9 @@ object ServersData {
             ping = 45,
             load = 30,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 45.4642,
+            longitude = 9.19
         ),
         
         // Canada
@@ -97,7 +113,9 @@ object ServersData {
             ping = 30,
             load = 18,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 51.0447,
+            longitude = -114.0719
         ),
         
         // Middle East
@@ -109,7 +127,9 @@ object ServersData {
             ping = 85,
             load = 35,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = 25.2048,
+            longitude = 55.2708
         ),
         
         // Africa
@@ -121,7 +141,9 @@ object ServersData {
             ping = 120,
             load = 45,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = -33.9249,
+            longitude = 18.4241
         ),
         
         // Asia Pacific
@@ -133,7 +155,9 @@ object ServersData {
             ping = 95,
             load = 40,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = 22.3193,
+            longitude = 114.1694
         ),
         Server(
             id = "ap-mumbai-1",
@@ -143,7 +167,9 @@ object ServersData {
             ping = 110,
             load = 50,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 19.076,
+            longitude = 72.8777
         ),
         Server(
             id = "ap-singapore-1",
@@ -153,7 +179,9 @@ object ServersData {
             ping = 90,
             load = 32,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 1.3521,
+            longitude = 103.8198
         ),
         Server(
             id = "ap-sydney-1",
@@ -163,7 +191,9 @@ object ServersData {
             ping = 130,
             load = 38,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = -33.8688,
+            longitude = 151.2093
         ),
         Server(
             id = "ap-jakarta-1",
@@ -173,7 +203,9 @@ object ServersData {
             ping = 115,
             load = 55,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = -6.2088,
+            longitude = 106.8456
         ),
         Server(
             id = "ap-malaysia-1",
@@ -183,7 +215,9 @@ object ServersData {
             ping = 105,
             load = 42,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 3.139,
+            longitude = 101.6869
         ),
         Server(
             id = "ap-seoul-1",
@@ -193,7 +227,9 @@ object ServersData {
             ping = 100,
             load = 35,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 37.5665,
+            longitude = 126.978
         ),
         Server(
             id = "ap-taipei-1",
@@ -203,7 +239,9 @@ object ServersData {
             ping = 105,
             load = 40,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 25.0329,
+            longitude = 121.5654
         ),
         Server(
             id = "ap-tokyo-1",
@@ -213,7 +251,9 @@ object ServersData {
             ping = 95,
             load = 30,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 35.6895,
+            longitude = 139.6917
         ),
         
         // South America
@@ -225,7 +265,9 @@ object ServersData {
             ping = 140,
             load = 60,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = -23.5505,
+            longitude = -46.6333
         ),
         
         // Mexico
@@ -237,7 +279,9 @@ object ServersData {
             ping = 50,
             load = 25,
             isOptimal = false,
-            isPremium = false
+            isPremium = false,
+            latitude = 19.4326,
+            longitude = -99.1332
         ),
         
         // Israel
@@ -249,7 +293,9 @@ object ServersData {
             ping = 80,
             load = 35,
             isOptimal = false,
-            isPremium = true
+            isPremium = true,
+            latitude = 32.0853,
+            longitude = 34.7818
         )
     )
     
