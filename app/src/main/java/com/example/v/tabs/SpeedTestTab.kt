@@ -1,97 +1,116 @@
+// In tabs/SpeedTestTab.kt
 package com.example.v.tabs
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.example.v.components.SpeedTestGauge
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import com.example.v.components.WebStyleConnectButton
 
 @Composable
-fun EngineStyleSpeedTest(
-    download: Float,
-    upload: Float,
-    ping: Float,
-    modifier: Modifier = Modifier
+fun SpeedTestTab(
+    isDarkTheme: Boolean,
+    onThemeToggle: () -> Unit
 ) {
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+    var isRunning by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<SpeedTestResults?>(null) }
+    val coroutineScope = rememberCoroutineScope()
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SpeedGauge(speed = download, label = "DOWNLOAD", color = Color(0xFF4CAF50))
-        SpeedGauge(speed = ping, label = "PING", color = Color(0xFFFF9800))
-        SpeedGauge(speed = upload, label = "UPLOAD", color = Color(0xFFE040FB))
-    }
-}
-
-@Composable
-fun SpeedGauge(speed: Float, label: String, color: Color, modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.size(150.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val radius = size.minDimension / 2
-            val strokeWidth = 15.dp.toPx()
-
-            // Background arc (gauge)
-            drawArc(
-                color = color.copy(alpha = 0.15f),
-                startAngle = 135f,
-                sweepAngle = 270f,
-                useCenter = false,
-                style = Stroke(strokeWidth, cap = StrokeCap.Round)
+        if (isRunning) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(48.dp),
+                color = MaterialTheme.colorScheme.primary
             )
-
-            // Foreground arc (progress)
-            val sweepAngle = (270f * (speed / 100f)).coerceIn(0f, 270f)
-            drawArc(
-                color = color,
-                startAngle = 135f,
-                sweepAngle = sweepAngle,
-                useCenter = false,
-                style = Stroke(strokeWidth, cap = StrokeCap.Round)
-            )
-
-            // Needle position
-            val needleAngle = Math.toRadians((135 + sweepAngle).toDouble())
-            val needleLength = radius - strokeWidth * 1.5f
-            val center = Offset(size.width / 2, size.height / 2)
-            val needleEnd = Offset(
-                (center.x + needleLength * kotlin.math.cos(needleAngle)).toFloat(),
-                (center.y + needleLength * kotlin.math.sin(needleAngle)).toFloat()
-            )
-
-            drawLine(
-                color = color,
-                start = center,
-                end = needleEnd,
-                strokeWidth = 4.dp.toPx(),
-                cap = StrokeCap.Round
-            )
-        }
-
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(label, color = color.copy(alpha = 0.6f), style = MaterialTheme.typography.labelSmall)
+            Spacer(modifier = Modifier.height(16.dp))
             Text(
-                text = if (label == "PING") "${speed.toInt()} ms" else "${speed.toInt()} Mbps",
-                color = color,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold
+                text = "Testing connection...",
+                style = MaterialTheme.typography.bodyLarge
             )
+        } else if (results != null) {
+            // Show the gauge component
+            SpeedTestGauge(
+                downloadSpeed = results!!.downloadSpeed,
+                uploadSpeed = results!!.uploadSpeed,
+                ping = results!!.ping.toFloat(),
+                isDarkTheme = isDarkTheme,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 24.dp)
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Button(
+                onClick = {
+                    isRunning = true
+                    results = null
+                    coroutineScope.launch {
+                        delay(3000) // Simulate test
+                        results = SpeedTestResults(
+                            downloadSpeed = (50..150).random().toFloat(),
+                            uploadSpeed = (10..50).random().toFloat(),
+                            ping = (10..100).random(),
+                            jitter = (1..10).random()
+                        )
+                        isRunning = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Run Test Again")
+            }
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Spacer(modifier = Modifier.height(80.dp))
+                Text(
+                    text = "Speed Test",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Measure your connection speed",
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Spacer(modifier = Modifier.height(40.dp))
+                Button(
+                    onClick = {
+                        isRunning = true
+                        coroutineScope.launch {
+                            delay(3000) // Simulate test
+                            results = SpeedTestResults(
+                                downloadSpeed = (50..150).random().toFloat(),
+                                uploadSpeed = (10..50).random().toFloat(),
+                                ping = (10..100).random(),
+                                jitter = (1..10).random()
+                            )
+                            isRunning = false
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Start Test")
+                }
+            }
         }
     }
 }
+
+data class SpeedTestResults(
+    val downloadSpeed: Float,
+    val uploadSpeed: Float,
+    val ping: Int,
+    val jitter: Int
+)

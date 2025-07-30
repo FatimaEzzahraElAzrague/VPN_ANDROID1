@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,10 +27,17 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.nativeCanvas
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
+import com.example.v.components.SpeedTestGauge
+import com.example.v.components.AppIcon
+import com.example.v.models.InstalledApp
+import com.example.v.utils.AppUtils
+import androidx.compose.ui.platform.LocalContext
 
 // Import theme colors
 import com.example.v.ui.theme.*
@@ -113,7 +121,7 @@ fun SettingsScreen(
     var showSecurityPage by remember { mutableStateOf(false) }
     var showSpeedTestPage by remember { mutableStateOf(false) }
     var showSplitTunnelingPage by remember { mutableStateOf(false) }
-    
+
     // Security states
     var adBlockEnabled by remember { mutableStateOf(true) }
     var malwareBlockEnabled by remember { mutableStateOf(true) }
@@ -122,7 +130,7 @@ fun SettingsScreen(
     var dnsLeakProtectionEnabled by remember { mutableStateOf(true) }
     var selectedApps by remember { mutableStateOf(setOf<String>()) }
     var isSplitTunnelingExpanded by remember { mutableStateOf(false) }
-    
+
     val coroutineScope = rememberCoroutineScope()
 
     Box(
@@ -174,7 +182,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(bottom = 12.dp, top = 16.dp)
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Subscription",
@@ -184,7 +192,7 @@ fun SettingsScreen(
                         isDarkTheme = isDarkTheme
                     )
                 }
-                
+
                 item {
                     HorizontalDivider(
                         modifier = Modifier.padding(vertical = 8.dp),
@@ -203,7 +211,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(bottom = 12.dp, top = 16.dp)
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Auto Connect",
@@ -213,7 +221,7 @@ fun SettingsScreen(
                         isDarkTheme = isDarkTheme
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Kill Switch",
@@ -223,7 +231,7 @@ fun SettingsScreen(
                         isDarkTheme = isDarkTheme
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Split Tunneling",
@@ -233,7 +241,7 @@ fun SettingsScreen(
                         isDarkTheme = isDarkTheme
                     )
                 }
-                
+
                 item {
                     HorizontalDivider(
                         color = getSecondaryTextColor().copy(alpha = 0.3f),
@@ -252,7 +260,7 @@ fun SettingsScreen(
                         modifier = Modifier.padding(bottom = 12.dp, top = 16.dp)
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Security Settings",
@@ -262,7 +270,7 @@ fun SettingsScreen(
                         isDarkTheme = isDarkTheme
                     )
                 }
-                
+
                 item {
                     SettingsRow(
                         title = "Speed Test",
@@ -284,7 +292,7 @@ fun SettingsScreen(
             onThemeToggle = onThemeToggle
         )
     }
-    
+
     if (showKillSwitchPage) {
         KillSwitchPage(
             isDarkTheme = isDarkTheme,
@@ -292,7 +300,7 @@ fun SettingsScreen(
             onThemeToggle = onThemeToggle
         )
     }
-    
+
     if (showSubscriptionPage) {
         SubscriptionPage(
             isDarkTheme = isDarkTheme,
@@ -300,7 +308,7 @@ fun SettingsScreen(
             onThemeToggle = onThemeToggle
         )
     }
-    
+
     if (showSecurityPage) {
         SecurityPage(
             isDarkTheme = isDarkTheme,
@@ -308,7 +316,7 @@ fun SettingsScreen(
             onThemeToggle = onThemeToggle
         )
     }
-    
+
     if (showSpeedTestPage) {
         SpeedTestPage(
             isDarkTheme = isDarkTheme,
@@ -316,7 +324,7 @@ fun SettingsScreen(
             onThemeToggle = onThemeToggle
         )
     }
-    
+
     if (showSplitTunnelingPage) {
         SplitTunnelingPage(
             isDarkTheme = isDarkTheme,
@@ -461,7 +469,7 @@ private fun AutoConnectPage(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             // Auto Connect Toggle
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -509,7 +517,7 @@ private fun AutoConnectPage(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                
+
                                 // Connection options
                                 val options = listOf("Always", "On untrusted networks", "Never")
                                 options.forEach { option ->
@@ -547,7 +555,7 @@ private fun AutoConnectPage(
                                     color = getSecondaryTextColor()
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                
+
                                 SettingsRow(
                                     title = "Trusted networks",
                                     description = "Auto Connect won't connect to your VPN when this device is on a trusted network",
@@ -638,7 +646,7 @@ private fun KillSwitchPage(
                                 color = getSecondaryTextColor()
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -684,7 +692,7 @@ private fun KillSwitchPage(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(12.dp))
-                            
+
                             StepItem(
                                 number = 1,
                                 text = "When Kill Switch is enabled, all internet traffic is blocked",
@@ -772,7 +780,7 @@ private fun SubscriptionPage(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -824,7 +832,7 @@ private fun SubscriptionPage(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             SettingsRow(
                                 title = "Linked to",
                                 description = "Not linked to Avast Account",
@@ -832,13 +840,13 @@ private fun SubscriptionPage(
                                 onClick = { },
                                 isDarkTheme = isDarkTheme
                             )
-                            
+
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 thickness = 0.5.dp,
                                 color = getSecondaryTextColor().copy(alpha = 0.3f)
                             )
-                            
+
                             SettingsRow(
                                 title = "Activation code",
                                 description = "VT52XC-5D7YJJ-4HCHHJ",
@@ -921,7 +929,7 @@ private fun SecurityPage(
                                 fontWeight = FontWeight.Bold
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             SecurityOption(
                                 title = "Ad Blocker",
                                 description = "Block ads and trackers",
@@ -929,13 +937,13 @@ private fun SecurityPage(
                                 onToggle = { adBlockEnabled = it },
                                 isDarkTheme = isDarkTheme
                             )
-                            
+
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 thickness = 0.5.dp,
                                 color = getSecondaryTextColor().copy(alpha = 0.3f)
                             )
-                            
+
                             SecurityOption(
                                 title = "Malware Protection",
                                 description = "Block malicious websites",
@@ -943,13 +951,13 @@ private fun SecurityPage(
                                 onToggle = { malwareBlockEnabled = it },
                                 isDarkTheme = isDarkTheme
                             )
-                            
+
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 thickness = 0.5.dp,
                                 color = getSecondaryTextColor().copy(alpha = 0.3f)
                             )
-                            
+
                             SecurityOption(
                                 title = "Family Mode",
                                 description = "Block inappropriate content",
@@ -957,13 +965,13 @@ private fun SecurityPage(
                                 onToggle = { familyModeEnabled = it },
                                 isDarkTheme = isDarkTheme
                             )
-                            
+
                             HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 8.dp),
                                 thickness = 0.5.dp,
                                 color = getSecondaryTextColor().copy(alpha = 0.3f)
                             )
-                            
+
                             SecurityOption(
                                 title = "DNS Leak Protection",
                                 description = "Prevent DNS leaks",
@@ -988,11 +996,23 @@ private fun SplitTunnelingPage(
     var splitTunnelingEnabled by remember { mutableStateOf(false) }
     var selectedApps by remember { mutableStateOf(setOf<String>()) }
     var isExpanded by remember { mutableStateOf(false) }
+    var showSystemApps by remember { mutableStateOf(false) }
+    var isLoadingApps by remember { mutableStateOf(true) }
 
-    val apps = listOf(
-        "Chrome", "Firefox", "Safari", "Gmail", "WhatsApp", "Telegram",
-        "Instagram", "Facebook", "Twitter", "YouTube", "Netflix", "Spotify"
-    )
+    val context = LocalContext.current
+    val installedApps by remember {
+        derivedStateOf {
+            try {
+                isLoadingApps = true
+                val apps = AppUtils.getFilteredApps(context, showSystemApps)
+                isLoadingApps = false
+                apps
+            } catch (e: Exception) {
+                isLoadingApps = false
+                emptyList()
+            }
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -1056,7 +1076,7 @@ private fun SplitTunnelingPage(
                                 color = getSecondaryTextColor()
                             )
                             Spacer(modifier = Modifier.height(16.dp))
-                            
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1103,50 +1123,97 @@ private fun SplitTunnelingPage(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
-                                
-                                apps.forEach { appName ->
-                                    val isSelected = selectedApps.contains(appName)
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                selectedApps = if (isSelected) {
-                                                    selectedApps - appName
-                                                } else {
-                                                    selectedApps + appName
+
+                                // Add filter toggle for system apps
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Show System Apps",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = getSecondaryTextColor(),
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Switch(
+                                        checked = showSystemApps,
+                                        onCheckedChange = { showSystemApps = it },
+                                        colors = SwitchDefaults.colors(
+                                            checkedThumbColor = OrangeCrayola,
+                                            checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                }
+
+                                // App count
+                                Text(
+                                    text = "${installedApps.size} apps found",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = getSecondaryTextColor(),
+                                    modifier = Modifier.padding(bottom = 16.dp)
+                                )
+
+                                LazyColumn(
+                                    modifier = Modifier.heightIn(max = 400.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    items(
+                                        items = installedApps,
+                                        key = { it.packageName }
+                                    ) { app ->
+                                        val isSelected = selectedApps.contains(app.packageName)
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clickable {
+                                                    selectedApps = if (isSelected) {
+                                                        selectedApps - app.packageName
+                                                    } else {
+                                                        selectedApps + app.packageName
+                                                    }
+                                                }
+                                                .padding(vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            AppIcon(
+                                                drawable = app.appIcon,
+                                                tint = if (isSelected) OrangeCrayola else getSecondaryTextColor()
+                                            )
+                                            Spacer(modifier = Modifier.width(16.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = app.appName,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
+                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                                )
+                                                if (app.isSystemApp) {
+                                                    Text(
+                                                        text = "System App",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = getSecondaryTextColor(),
+                                                        fontSize = 10.sp
+                                                    )
                                                 }
                                             }
-                                            .padding(vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Apps,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp),
-                                            tint = if (isSelected) OrangeCrayola else getSecondaryTextColor()
-                                        )
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                        Text(
-                                            text = appName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                        )
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Checkbox(
-                                            checked = isSelected,
-                                            onCheckedChange = {
-                                                selectedApps = if (isSelected) {
-                                                    selectedApps - appName
-                                                } else {
-                                                    selectedApps + appName
-                                                }
-                                            },
-                                            colors = CheckboxDefaults.colors(
-                                                checkedColor = OrangeCrayola,
-                                                uncheckedColor = getSecondaryTextColor()
+                                            Spacer(modifier = Modifier.weight(1f))
+                                            Checkbox(
+                                                checked = isSelected,
+                                                onCheckedChange = {
+                                                    selectedApps = if (isSelected) {
+                                                        selectedApps - app.packageName
+                                                    } else {
+                                                        selectedApps + app.packageName
+                                                    }
+                                                },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = OrangeCrayola,
+                                                    uncheckedColor = getSecondaryTextColor()
+                                                )
                                             )
-                                        )
+                                        }
                                     }
                                 }
                             }
@@ -1206,309 +1273,149 @@ private fun SpeedTestPage(
                 )
             }
 
-            LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(24.dp),
-                contentPadding = PaddingValues(bottom = 24.dp) // Add bottom padding
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                item {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
+                if (isRunning) {
+                    // Show loading animation
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 80.dp) // Add extra padding for the button
+                            .height(300.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        if (isRunning) {
-                            // Car Engine Animation
-                            val infiniteTransition = rememberInfiniteTransition(label = "engine")
-                            val rotationAngle by infiniteTransition.animateFloat(
-                                initialValue = 0f,
-                                targetValue = 360f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(1000, easing = LinearEasing),
-                                    repeatMode = RepeatMode.Restart
-                                ),
-                                label = "rotation"
-                            )
-                            
-                            val scale by infiniteTransition.animateFloat(
-                                initialValue = 1f,
-                                targetValue = 1.1f,
-                                animationSpec = infiniteRepeatable(
-                                    animation = tween(500, easing = FastOutSlowInEasing),
-                                    repeatMode = RepeatMode.Reverse
-                                ),
-                                label = "scale"
-                            )
+                        CircularProgressIndicator(
+                            color = OrangeCrayola,
+                            modifier = Modifier.size(80.dp)
+                        )
+                    }
+                    Text(
+                        text = "Testing your connection...",
+                        style = MaterialTheme.typography.titleMedium,
+                        color = getPrimaryTextColor(isDarkTheme),
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                } else if (results != null) {
+                    // Show results with car engine gauges
+                    SpeedTestGauge(
+                        downloadSpeed = results!!.downloadSpeed,
+                        uploadSpeed = results!!.uploadSpeed,
+                        ping = results!!.ping.toFloat(),
+                        isDarkTheme = isDarkTheme,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp)
+                    )
 
-                            Box(
-                                modifier = Modifier
-                                    .size(280.dp)
-                                    .background(
-                                        brush = Brush.radialGradient(
-                                            colors = listOf(
-                                                OrangeCrayola.copy(alpha = 0.3f),
-                                                Color.Transparent
-                                            )
-                                        ),
-                                        shape = CircleShape
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                // Engine Block
-                                Canvas(
-                                    modifier = Modifier
-                                        .size(240.dp)
-                                        .scale(scale)
-                                ) {
-                                    val center = Offset(size.width / 2, size.height / 2)
-                                    val radius = size.width / 2 - 20f
-                                    
-                                    // Engine block (rectangular)
-                                    drawRoundRect(
-                                        color = getCardBackgroundColor(isDarkTheme),
-                                        topLeft = Offset(center.x - radius * 0.8f, center.y - radius * 0.6f),
-                                        size = androidx.compose.ui.geometry.Size(radius * 1.6f, radius * 1.2f),
-                                        cornerRadius = androidx.compose.ui.geometry.CornerRadius(16f)
-                                    )
-                                    
-                                    // Pistons (cylinders)
-                                    for (i in 0..3) {
-                                        val pistonX = center.x - radius * 0.6f + (i * radius * 0.4f)
-                                        val pistonY = center.y - radius * 0.4f
-                                        
-                                        // Cylinder
-                                        drawCircle(
-                                            color = getPrimaryTextColor(isDarkTheme).copy(alpha = 0.3f),
-                                            radius = 20f,
-                                            center = Offset(pistonX, pistonY)
-                                        )
-                                        
-                                        // Piston (moving)
-                                        val pistonOffset = (kotlin.math.sin(rotationAngle * 0.1f + i) * 15f).toFloat()
-                                        drawCircle(
-                                            color = OrangeCrayola,
-                                            radius = 15f,
-                                            center = Offset(pistonX, pistonY + pistonOffset)
-                                        )
-                                    }
-                                    
-                                    // Crankshaft
-                                    drawLine(
-                                        color = OrangeCrayola,
-                                        start = Offset(center.x - radius * 0.8f, center.y + radius * 0.3f),
-                                        end = Offset(center.x + radius * 0.8f, center.y + radius * 0.3f),
-                                        strokeWidth = 8f
-                                    )
-                                    
-                                    // Engine details
-                                    drawCircle(
-                                        color = getSecondaryTextColor(),
-                                        radius = 8f,
-                                        center = Offset(center.x - radius * 0.4f, center.y + radius * 0.3f)
-                                    )
-                                    drawCircle(
-                                        color = getSecondaryTextColor(),
-                                        radius = 8f,
-                                        center = Offset(center.x + radius * 0.4f, center.y + radius * 0.3f)
-                                    )
-                                }
-                                
-                                // Digital Speed Display
-                                Box(
-                                    modifier = Modifier
-                                        .size(120.dp)
-                                        .background(
-                                            color = getCardBackgroundColor(isDarkTheme).copy(alpha = 0.9f),
-                                            shape = RoundedCornerShape(16.dp)
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally
-                                    ) {
-                                        Text(
-                                            text = "85",
-                                            style = MaterialTheme.typography.headlineMedium,
-                                            color = OrangeCrayola,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                        Text(
-                                            text = "Mbps",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = getSecondaryTextColor()
-                                        )
-                                    }
-                                }
-                            }
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Text(
-                                text = "Engine is running at full power!",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = getPrimaryTextColor(isDarkTheme),
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(
-                                text = "Testing your VPN connection speed...",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = getSecondaryTextColor(),
-                                textAlign = TextAlign.Center
-                            )
-                        } else if (results != null) {
-                            // Results
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Test Results",
-                                        style = MaterialTheme.typography.titleLarge,
-                                        color = getPrimaryTextColor(isDarkTheme),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Card(
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = OrangeCrayola.copy(alpha = 0.1f)
-                                        )
-                                    ) {
-                                        Text(
-                                            text = "Excellent",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = OrangeCrayola,
-                                            fontWeight = FontWeight.Bold,
-                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                                        )
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(24.dp))
+                    // Additional test info
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                    ) {
+                        Text(
+                            text = "Test Summary",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = getPrimaryTextColor(isDarkTheme),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
 
-                                // Speed Metrics
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    SpeedMetricCard(
-                                        title = "Download",
-                                        value = "${results!!.downloadSpeed}",
-                                        unit = "Mbps",
-                                        color = OrangeCrayola,
-                                        icon = Icons.Default.Download,
-                                        isDarkTheme = isDarkTheme,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    SpeedMetricCard(
-                                        title = "Upload",
-                                        value = "${results!!.uploadSpeed}",
-                                        unit = "Mbps",
-                                        color = OrangeCrayola,
-                                        icon = Icons.Default.Upload,
-                                        isDarkTheme = isDarkTheme,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                                ) {
-                                    SpeedMetricCard(
-                                        title = "Ping",
-                                        value = "${results!!.ping}",
-                                        unit = "ms",
-                                        color = OrangeCrayola,
-                                        icon = Icons.Default.Timer,
-                                        isDarkTheme = isDarkTheme,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    SpeedMetricCard(
-                                        title = "Jitter",
-                                        value = "${results!!.jitter}",
-                                        unit = "ms",
-                                        color = OrangeCrayola,
-                                        icon = Icons.Default.Tune,
-                                        isDarkTheme = isDarkTheme,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                }
-                            }
-                        } else {
-                            // Start Test
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally
-                            ) {
-                                // Engine Start Button
-                                Card(
-                                    modifier = Modifier
-                                        .size(200.dp)
-                                        .clickable {
-                                            isRunning = true
-                                            coroutineScope.launch {
-                                                delay(5000)
-                                                results = SpeedTestResults(
-                                                    downloadSpeed = 85.2f,
-                                                    uploadSpeed = 42.1f,
-                                                    ping = 25,
-                                                    jitter = 5
-                                                )
-                                                isRunning = false
-                                            }
-                                        },
-                                    shape = RoundedCornerShape(20.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = OrangeCrayola.copy(alpha = 0.1f)
-                                    ),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize(),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Column(
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Speed,
-                                                contentDescription = "Start Engine",
-                                                tint = OrangeCrayola,
-                                                modifier = Modifier.size(48.dp)
-                                            )
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Text(
-                                                text = "Start Engine",
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = OrangeCrayola,
-                                                fontWeight = FontWeight.Bold
-                                            )
-                                        }
-                                    }
-                                }
-                                Spacer(modifier = Modifier.height(24.dp))
-                                Text(
-                                    text = "Test Your Connection Speed",
-                                    style = MaterialTheme.typography.titleLarge,
-                                    color = getPrimaryTextColor(isDarkTheme),
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Rev up your engine to test VPN performance",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = getSecondaryTextColor(),
-                                    textAlign = TextAlign.Center
-                                )
-                            }
+                        // Server location info
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Server",
+                                tint = getSecondaryTextColor()
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Server: New York, USA",
+                                color = getSecondaryTextColor()
+                            )
                         }
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Run another test button
+                        PrimaryButton(
+                            onClick = {
+                                isRunning = true
+                                results = null
+                                coroutineScope.launch {
+                                    delay(3000) // Simulate test
+                                    results = SpeedTestResults(
+                                        downloadSpeed = (50..150).random().toFloat(),
+                                        uploadSpeed = (10..50).random().toFloat(),
+                                        ping = (10..100).random(),
+                                        jitter = (1..10).random()
+                                    )
+                                    isRunning = false
+                                }
+                            },
+                            text = "Run Another Test",
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                } else {
+                    // Initial state - no test run yet
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Spacer(modifier = Modifier.height(40.dp))
+                        Icon(
+                            imageVector = Icons.Default.Speed,
+                            contentDescription = "Speed Test",
+                            tint = OrangeCrayola,
+                            modifier = Modifier.size(80.dp)
+                        )
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Text(
+                            text = "Test Your Connection",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = getPrimaryTextColor(isDarkTheme),
+                            fontWeight = FontWeight.Bold
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Measure your download, upload speeds and ping",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = getSecondaryTextColor(),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                        Spacer(modifier = Modifier.height(40.dp))
+                        PrimaryButton(
+                            onClick = {
+                                isRunning = true
+                                coroutineScope.launch {
+                                    delay(3000) // Simulate test
+                                    results = SpeedTestResults(
+                                        downloadSpeed = (50..150).random().toFloat(),
+                                        uploadSpeed = (10..50).random().toFloat(),
+                                        ping = (10..100).random(),
+                                        jitter = (1..10).random()
+                                    )
+                                    isRunning = false
+                                }
+                            },
+                            text = "Start Test",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 48.dp)
+                        )
                     }
                 }
             }
         }
     }
 }
-
 @Composable
 private fun RadioOption(
     text: String,

@@ -24,7 +24,7 @@ fun WebStyleConnectButton(
     modifier: Modifier = Modifier
 ) {
     val primaryOrange = Color(0xFFFF6C36)
-    val isDarkTheme = MaterialTheme.colorScheme.surface == Color(0xFF1A1D2E)
+    val darkBackground = Color(0xFF1A1D2E)
     
     // Determine button state and colors
     val buttonColor = when {
@@ -34,65 +34,71 @@ fun WebStyleConnectButton(
     }
     
     val iconColor = Color.White
-    val textColor = if (isDarkTheme) Color.White else Color(0xFF2A2D3E)
+    val textColor = Color.White
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(darkBackground)
     ) {
-        // Main circular button - large size like web app
-        Box(
+        Column(
             modifier = Modifier
-                .size(180.dp) // Large size to match web app
-                .clip(CircleShape)
-                .background(buttonColor)
-                .clickable(enabled = !isConnecting) { onToggle() },
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            if (isConnecting) {
-                // Show loading indicator when connecting
-                CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
-                    color = Color.White,
-                    strokeWidth = 4.dp
-                )
-            } else {
-                // Show power icon
-                Icon(
-                    imageVector = Icons.Default.Power,
-                    contentDescription = if (isConnected) "Disconnect" else "Connect",
-                    tint = iconColor,
-                    modifier = Modifier.size(48.dp) // Large icon to match web app
-                )
+            // Main circular button - large size like the design
+            Box(
+                modifier = Modifier
+                    .size(200.dp) // Large size to match the design
+                    .clip(CircleShape)
+                    .background(buttonColor)
+                    .clickable(enabled = !isConnecting) { onToggle() },
+                contentAlignment = Alignment.Center
+            ) {
+                if (isConnecting) {
+                    // Show loading indicator when connecting
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = Color.White,
+                        strokeWidth = 4.dp
+                    )
+                } else {
+                    // Show power icon - large and white
+                    Icon(
+                        imageVector = Icons.Default.Power,
+                        contentDescription = if (isConnected) "Disconnect" else "Connect",
+                        tint = iconColor,
+                        modifier = Modifier.size(56.dp) // Large icon to match design
+                    )
+                }
             }
-        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
-        // Button text - "CONNECT" like web app
-        Text(
-            text = when {
-                isConnecting -> "CONNECTING..."
-                isConnected -> "CONNECTED"
-                else -> "CONNECT"
-            },
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            color = if (isConnected) {
-                if (isDarkTheme) Color.White else Color(0xFF34A853)
-            } else {
-                textColor
-            }
-        )
-
-        // Optional: Show connection time when connected
-        if (isConnected) {
-            Spacer(modifier = Modifier.height(8.dp))
+            // Button text - "CONNECT" like the design
             Text(
-                text = "00:00:00", // You can replace with actual connection time
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                text = when {
+                    isConnecting -> "CONNECTING..."
+                    isConnected -> "CONNECTED"
+                    else -> "CONNECT"
+                },
+                style = MaterialTheme.typography.headlineMedium,
+                fontWeight = FontWeight.Bold,
+                color = textColor,
+                fontSize = 20.sp
             )
+
+            // Optional: Show connection time when connected
+            if (isConnected) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "00:00:00", // You can replace with actual connection time
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = textColor.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 } 

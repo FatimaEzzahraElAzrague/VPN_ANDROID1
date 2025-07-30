@@ -28,7 +28,7 @@ private val LightColorScheme = lightColorScheme(
 
 private val DarkColorScheme = darkColorScheme(
     primary = DarkOrangeCrayola,
-    onPrimary = DarkBlack,
+    onPrimary = Color.White,
     primaryContainer = DarkOrangeCrayola.copy(alpha = 0.2f),
     onPrimaryContainer = Color.White,
 
@@ -38,11 +38,13 @@ private val DarkColorScheme = darkColorScheme(
     background = DarkOxfordBlue,
     onBackground = Color.White,
 
-    surface = DarkGunmetalSecondary,
-    onSurface = Color.White,
+    surface = DarkSurface,
+    onSurface = DarkOnSurface,
+    surfaceVariant = DarkGunmetalSecondary,
+    onSurfaceVariant = DarkOnSurfaceSecondary,
 
     error = Color(0xFFCF6679),
-    onError = DarkBlack
+    onError = Color.White
 )
 
 @Composable

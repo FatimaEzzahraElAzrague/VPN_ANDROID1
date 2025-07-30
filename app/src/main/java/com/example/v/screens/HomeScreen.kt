@@ -20,7 +20,7 @@ fun HomeScreen(
 ) {
     var isConnected by remember { mutableStateOf(false) }
 
-    // Default user location (create a proper Server instance)
+    // Default user location
     val userLocation = remember {
         Server(
             id = "user",
@@ -55,12 +55,14 @@ fun HomeScreen(
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
+            // New connection button with status indicator
             ConnectionButton(
                 isConnected = isConnected,
-                onToggle = { isConnected = !isConnected }
+                onToggle = { isConnected = !isConnected },
+                modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             ServerLocationCard(
                 server = currentServer,
