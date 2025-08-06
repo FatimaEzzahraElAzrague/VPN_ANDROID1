@@ -1,18 +1,20 @@
-// components/ConnectionButton.kt
 package com.example.v.components
 
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Power
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -21,63 +23,68 @@ import androidx.compose.ui.unit.sp
 @Composable
 fun ConnectionButton(
     isConnected: Boolean,
-    onToggle: () -> Unit,
+    onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val primaryOrange = Color(0xFFFF6C36)
-    val isDarkTheme = MaterialTheme.colorScheme.surface == Color(0xFF1A1D2E)
-    val buttonColor = if (isConnected) primaryOrange else Color(0xFF2A2D3E)
-    val textColor = if (isDarkTheme) Color.White else Color(0xFF2A2D3E)
+    var isPressed by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // Main circular button
-        Box(
-            modifier = Modifier
-                .size(120.dp)
-                .clip(CircleShape)
-                .background(buttonColor)
-                .clickable { onToggle() },
-            contentAlignment = Alignment.Center
-        ) {
-            if (isConnected) {
-                // Connected state - show power icon
-                Icon(
-                    imageVector = Icons.Default.Power,
-                    contentDescription = "Disconnect",
-                    tint = Color.White,
-                    modifier = Modifier.size(32.dp)
-                )
-            } else {
-                // Disconnected state - show power icon outline
-                Icon(
-                    imageVector = Icons.Default.Power,
-                    contentDescription = "Connect",
-                    tint = if (isDarkTheme) Color.White else primaryOrange,
-                    modifier = Modifier.size(32.dp)
-                )
-            }
-        }
+    val scale by animateFloatAsState(
+        targetValue = if (isPressed) 0.95f else 1f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "buttonScale"
+    )
 
-        Spacer(modifier = Modifier.height(16.dp))
+    val buttonColor = if (isConnected) Color(0xFF4CAF50) else MaterialTheme.colorScheme.primary
+    val shadowColor = buttonColor.copy(alpha = 0.3f)
 
-        // Button text
-        Text(
-            text = if (isConnected) "CONNECTED" else "TAP TO CONNECT",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = if (isConnected) primaryOrange else textColor
-        )
-
-        if (isConnected) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "00:00:00", // You can replace with actual connection time
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = modifier
+            .scale(scale)
+            .shadow(
+                elevation = if (isPressed) 8.dp else 12.dp,
+                shape = CircleShape,
+                ambientColor = shadowColor,
+                spotColor = shadowColor
             )
+            .clip(CircleShape)
+            .background(buttonColor)
+            .clickable {
+                isPressed = true
+                onClick()
+            }
+            .padding(4.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = if (isConnected) Icons.Default.Shield else Icons.Default.Power,
+                contentDescription = if (isConnected) "Disconnect" else "Connect",
+                tint = Color.White,
+                modifier = Modifier.size(48.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Text(
+                text = if (isConnected) "DISCONNECT" else "CONNECT",
+                color = Color.White,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.1.sp
+            )
+        }
+    }
+
+    LaunchedEffect(isPressed) {
+        if (isPressed) {
+            kotlinx.coroutines.delay(100)
+            isPressed = false
         }
     }
 }

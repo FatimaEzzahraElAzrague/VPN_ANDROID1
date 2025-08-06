@@ -1,34 +1,23 @@
-// components/ServerLocationCard.kt
 package com.example.v.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
-import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.example.v.models.Server
 
-// components/ServerLocationCard.kt
 @Composable
 fun ServerLocationCard(
     server: Server,
@@ -36,62 +25,90 @@ fun ServerLocationCard(
     modifier: Modifier = Modifier
 ) {
     Card(
-        onClick = onClick,
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(16.dp),
+                ambientColor = Color.Black.copy(alpha = 0.2f)
+            )
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onClick() },
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant,
-            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
         )
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            // Country Flag Circle
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(
-                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f)
-                    ),
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.primary),
                 contentAlignment = Alignment.Center
             ) {
-                // You can replace this with your flag image if available
                 Icon(
-                    imageVector = Icons.Default.Public,
-                    contentDescription = "Server",
-                    tint = MaterialTheme.colorScheme.primary
+                    imageVector = getCountryIcon(server.countryCode),
+                    contentDescription = server.countryCode,
+                    tint = Color.White,
+                    modifier = Modifier.size(24.dp)
                 )
             }
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            Column(modifier = Modifier.weight(1f)) {
+            // Server Information
+            Column(
+                modifier = Modifier.weight(1f)
+            ) {
                 Text(
                     text = "Server Location",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Normal
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = "${server.country}, ${server.city}",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = server.name,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium
                 )
-                // Add ping and load information
+
+                Spacer(modifier = Modifier.height(2.dp))
+
                 Text(
-                    text = "Ping: ${server.ping}ms • Load: ${server.load}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    text = "Ping: ${server.ping} • Load: ${server.load}",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    fontSize = 12.sp
                 )
             }
 
+            // Arrow Icon
             Icon(
-                imageVector = Icons.AutoMirrored.Filled.ArrowForwardIos,
-                contentDescription = "Change Server",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "Select server",
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                modifier = Modifier.size(20.dp)
             )
         }
+    }
+}
+
+private fun getCountryIcon(countryCode: String): androidx.compose.ui.graphics.vector.ImageVector {
+    return when (countryCode) {
+        "US" -> Icons.Default.Flag
+        "FR" -> Icons.Default.Flag
+        "DE" -> Icons.Default.Flag
+        "UK" -> Icons.Default.Flag
+        "CA" -> Icons.Default.Flag
+        "JP" -> Icons.Default.Flag
+        else -> Icons.Default.Public
     }
 }

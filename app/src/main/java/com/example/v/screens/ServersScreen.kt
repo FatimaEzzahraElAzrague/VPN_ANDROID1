@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -17,45 +18,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.v.data.ServersData
 import com.example.v.models.Server
 import com.example.v.ui.theme.*
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ServersScreen(
-    servers: List<Server> = ServersData.servers,
-    selectedServer: Server? = null,
+    servers: List<Server>,
+    selectedServer: Server?,
+    connectedServer: Server?,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
     onServerSelect: (Server) -> Unit,
+    onServerFavorite: (Server) -> Unit,
     onBackClick: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedRegion by remember { mutableStateOf("All") }
+    var selectedFilter by remember { mutableStateOf("All") }
     
-    val regions = listOf("All", "US", "Europe", "Asia Pacific", "Canada", "Middle East", "Africa", "South America", "Mexico", "Israel")
-    
-    val filteredServers = remember(servers, searchQuery, selectedRegion) {
+    val filteredServers = remember(servers, searchQuery, selectedFilter) {
         servers.filter { server ->
-            val matchesSearch = server.country.contains(searchQuery, ignoreCase = true) ||
+            val matchesSearch = server.name.contains(searchQuery, ignoreCase = true) ||
+                    server.country.contains(searchQuery, ignoreCase = true) ||
                     server.city.contains(searchQuery, ignoreCase = true)
-            
-            val matchesRegion = when (selectedRegion) {
+            val matchesFilter = when (selectedFilter) {
                 "All" -> true
-                "US" -> server.id.startsWith("us-")
-                "Europe" -> server.id.startsWith("eu-")
-                "Asia Pacific" -> server.id.startsWith("ap-")
-                "Canada" -> server.id.startsWith("ca-")
-                "Middle East" -> server.id.startsWith("me-")
-                "Africa" -> server.id.startsWith("af-")
-                "South America" -> server.id.startsWith("sa-")
-                "Mexico" -> server.id.startsWith("mx-")
-                "Israel" -> server.id.startsWith("il-")
+                "Favorites" -> server.isFavorite
+                "Africa" -> server.country in listOf("South Africa")
+                "Asia" -> server.country in listOf("Japan", "Singapore", "South Korea", "Hong Kong", "India", "Indonesia", "Malaysia", "Taiwan", "United Arab Emirates", "Israel")
+                "Europe" -> server.country in listOf("United Kingdom", "Switzerland", "France", "Germany", "Spain", "Italy")
+                "America" -> server.country in listOf("United States", "Canada", "Brazil", "Mexico")
+                "Oceania" -> server.country in listOf("Australia")
                 else -> true
             }
-            
-            matchesSearch && matchesRegion
+            matchesSearch && matchesFilter
         }
     }
 
@@ -83,35 +79,84 @@ fun ServersScreen(
                 // Back button
                 IconButton(
                     onClick = onBackClick,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = getCardBackgroundColor(isDarkTheme),
+                            shape = CircleShape
+                        )
                 ) {
                     Icon(
                         imageVector = Icons.Default.ArrowBack,
                         contentDescription = "Back",
-                        tint = getPrimaryTextColor(isDarkTheme)
+                        tint = getPrimaryTextColor(isDarkTheme),
+                        modifier = Modifier.size(24.dp)
                     )
                 }
 
                 // Title
-                TitleText(
-                    text = "Servers",
-                    isDarkTheme = isDarkTheme
+            Text(
+                text = "Servers",
+                style = MaterialTheme.typography.headlineMedium,
+                    color = getPrimaryTextColor(isDarkTheme),
+                    fontWeight = FontWeight.Bold
                 )
 
-                // Theme toggle
-                ThemeToggleButton(
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle
-                )
+                // Theme toggle button
+                IconButton(
+                    onClick = onThemeToggle,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .background(
+                            color = getCardBackgroundColor(isDarkTheme),
+                            shape = CircleShape
+                        )
+                ) {
+                    Icon(
+                        imageVector = if (isDarkTheme) Icons.Default.LightMode else Icons.Default.DarkMode,
+                        contentDescription = "Toggle Theme",
+                        tint = getPrimaryTextColor(isDarkTheme),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
             }
 
-            // Search bar
+        // Quick Connect Button
+        Button(
+            onClick = {
+                    val optimalServer = servers.find { it.isOptimal }
+                    optimalServer?.let { onServerSelect(it) }
+            },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
+            colors = ButtonDefaults.buttonColors(
+                    containerColor = getOrangeColor()
+            ),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Bolt,
+                    contentDescription = "Quick Connect",
+                    tint = LightWhite,
+                modifier = Modifier.size(20.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = "Quick Connect to Fastest Server",
+                    color = LightWhite,
+                    fontWeight = FontWeight.SemiBold
+            )
+        }
+
+
+
+        // Search Bar
+            Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = searchQuery,
                 onValueChange = { searchQuery = it },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
+            modifier = Modifier.fillMaxWidth(),
                 placeholder = {
                     Text(
                         text = "Search servers...",
@@ -126,68 +171,48 @@ fun ServersScreen(
                     )
                 },
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = OrangeCrayola,
+                    focusedBorderColor = getOrangeColor(),
                     unfocusedBorderColor = getSecondaryTextColor(),
-                    focusedLabelColor = OrangeCrayola,
-                    unfocusedLabelColor = getSecondaryTextColor(),
-                    cursorColor = OrangeCrayola
-                ),
-                shape = RoundedCornerShape(16.dp)
-            )
+                    focusedTextColor = getPrimaryTextColor(isDarkTheme),
+                    unfocusedTextColor = getPrimaryTextColor(isDarkTheme)
+            ),
+            shape = RoundedCornerShape(12.dp)
+        )
 
-            // Quick Connect Button
-            PrimaryButton(
-                onClick = {
-                    val optimalServer = ServersData.getOptimalServer()
-                    if (optimalServer != null) {
-                        onServerSelect(optimalServer)
-                    }
-                },
-                text = "Quick Connect to Fastest Server",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 8.dp),
-                icon = Icons.Default.FlashOn
-            )
-
-            // Region filter
+            // Filter Buttons
+        Spacer(modifier = Modifier.height(16.dp))
             LazyRow(
-                modifier = Modifier.padding(vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 4.dp)
             ) {
-                items(regions) { region ->
+                val filters = listOf("All", "Favorites", "Africa", "Asia", "Europe", "America", "Oceania")
+                items(filters) { filter ->
                     FilterChip(
-                        onClick = { selectedRegion = region },
-                        label = { Text(region) },
-                        selected = selectedRegion == region,
+                        selected = selectedFilter == filter,
+                        onClick = { selectedFilter = filter },
+                        label = { Text(filter) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = OrangeCrayola,
+                            selectedContainerColor = getOrangeColor(),
                             selectedLabelColor = LightWhite
                         )
                     )
                 }
             }
 
-            // Server count
-            Text(
-                text = "${filteredServers.size} servers available",
-                style = MaterialTheme.typography.bodyMedium,
-                color = getSecondaryTextColor(),
-                modifier = Modifier.padding(vertical = 8.dp)
-            )
-
-            // Server list
+            // Server List
+        Spacer(modifier = Modifier.height(16.dp))
             LazyColumn(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(vertical = 16.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
                 items(filteredServers) { server ->
-                    ServerItem(
+                    ServerListItem(
                         server = server,
                         isSelected = selectedServer?.id == server.id,
+                        isConnected = connectedServer?.id == server.id,
                         isDarkTheme = isDarkTheme,
-                        onServerClick = { onServerSelect(server) }
+                        onServerSelect = onServerSelect,
+                        onServerFavorite = onServerFavorite
                     )
                 }
             }
@@ -195,197 +220,113 @@ fun ServersScreen(
     }
 }
 
+
+
 @Composable
-private fun ServerItem(
+private fun ServerListItem(
     server: Server,
     isSelected: Boolean,
+    isConnected: Boolean,
     isDarkTheme: Boolean,
-    onServerClick: () -> Unit
+    onServerSelect: (Server) -> Unit,
+    onServerFavorite: (Server) -> Unit
 ) {
-    Card(
+    Box(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable { onServerClick() },
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = getCardBackgroundColor(isDarkTheme).copy(alpha = 0.9f)
-        ),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = if (isSelected) 8.dp else 4.dp
-        )
+            .clickable { onServerSelect(server) }
+            .background(
+                color = when {
+                    isConnected -> Color(0xFFE53E3E).copy(alpha = 0.15f) // Faded red for connected
+                    isSelected -> Color(0xFFE53E3E).copy(alpha = 0.1f) // Faded red for selected
+                    else -> getCardBackgroundColor(isDarkTheme).copy(alpha = 0.9f)
+                },
+                shape = RoundedCornerShape(16.dp)
+            )
+            .padding(horizontal = 20.dp, vertical = 16.dp)
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Country flag
-                Text(
-                    text = server.flag,
-                    fontSize = 32.sp,
-                    modifier = Modifier.size(40.dp)
-                )
-
-                Spacer(modifier = Modifier.width(16.dp))
-
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = server.country,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = getPrimaryTextColor(isDarkTheme),
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 16.sp
-                        )
-
-                        if (server.isOptimal) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = OrangeCrayola.copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "Optimal",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = OrangeCrayola,
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-
-                        if (server.isPremium) {
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(
-                                modifier = Modifier
-                                    .background(
-                                        color = Color(0xFFFFD700).copy(alpha = 0.2f),
-                                        shape = RoundedCornerShape(8.dp)
-                                    )
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = "Premium",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = Color(0xFFFFD700),
-                                    fontSize = 10.sp
-                                )
-                            }
-                        }
-                    }
-
+                // Flag/Country icon
                     Text(
-                        text = server.city,
+                        text = server.flag,
+                    fontSize = 24.sp,
+                    modifier = Modifier.padding(end = 12.dp)
+                    )
+
+                    Column {
+                        Text(
+                            text = server.name,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = getPrimaryTextColor(isDarkTheme),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = "${server.ping}ms Ping • ${server.load}% Load",
                         style = MaterialTheme.typography.bodyMedium,
                         color = getSecondaryTextColor(),
                         fontSize = 14.sp
                     )
+                    
+                    // Status badges
+                    Row(
+                        modifier = Modifier.padding(top = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (server.isOptimal) {
+                            Badge(
+                                containerColor = Color(0xFFE53E3E).copy(alpha = 0.3f),
+                                contentColor = Color(0xFFE53E3E)
+                            ) {
+                                Text("Optimal", fontSize = 10.sp)
+                            }
+                        }
+                        if (server.isPremium) {
+                            Badge(
+                                containerColor = Color(0xFFE53E3E).copy(alpha = 0.3f),
+                                contentColor = Color(0xFFE53E3E)
+                            ) {
+                                Text("Premium", fontSize = 10.sp)
+                            }
+                        }
+                    }
                 }
             }
 
-            // Server stats
-            Column(
-                horizontalAlignment = Alignment.End
-            ) {
-                // Ping indicator
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
+            // Right side - Connection status and favorite
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    SignalStrengthIndicator(
-                        strength = getPingStrength(server.ping),
-                        color = getPingColor(server.ping)
-                    )
-
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    Text(
-                        text = "${server.ping}ms",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = getPingColor(server.ping),
-                        fontWeight = FontWeight.Medium,
-                        fontSize = 12.sp
+                // Connection indicator
+                if (isConnected) {
+                    Box(
+                        modifier = Modifier
+                            .size(12.dp)
+                            .background(Color(0xFFE53E3E), CircleShape)
                     )
                 }
-
-                Spacer(modifier = Modifier.height(4.dp))
-
-                // Load indicator
-                Text(
-                    text = "Load: ${server.load}%",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = getLoadColor(server.load),
-                    fontSize = 11.sp
-                )
-            }
-
-            // Selection indicator
-            if (isSelected) {
-                Spacer(modifier = Modifier.width(16.dp))
-                Icon(
-                    imageVector = Icons.Default.CheckCircle,
-                    contentDescription = "Selected",
-                    tint = OrangeCrayola,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun SignalStrengthIndicator(
-    strength: Int,
-    color: Color
-) {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(1.dp),
-        verticalAlignment = Alignment.Bottom
-    ) {
-        repeat(3) { index ->
-            Box(
-                modifier = Modifier
-                    .width(3.dp)
-                    .height((6 + index * 3).dp)
-                    .background(
-                        color = if (index < strength) color else color.copy(alpha = 0.3f),
-                        shape = RoundedCornerShape(1.dp)
+                
+                // Favorite button
+                IconButton(
+                    onClick = { onServerFavorite(server) },
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = if (server.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Favorite",
+                        tint = if (server.isFavorite) Color.Red else getSecondaryTextColor(),
+                        modifier = Modifier.size(20.dp)
                     )
-            )
+                }
+            }
         }
-    }
-}
-
-private fun getPingStrength(ping: Int): Int {
-    return when {
-        ping < 50 -> 3
-        ping < 100 -> 2
-        else -> 1
-    }
-}
-
-private fun getPingColor(ping: Int): Color {
-    return when {
-        ping < 50 -> Color(0xFF4CAF50) // Green
-        ping < 100 -> Color(0xFFFFC107) // Amber
-        else -> Color(0xFFF44336) // Red
-    }
-}
-
-private fun getLoadColor(load: Int): Color {
-    return when {
-        load < 30 -> Color(0xFF4CAF50) // Green
-        load < 70 -> Color(0xFFFFC107) // Amber
-        else -> Color(0xFFF44336) // Red
     }
 }

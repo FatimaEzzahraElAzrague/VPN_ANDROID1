@@ -92,11 +92,16 @@ fun VPNMapBackground(
         userLng = userLng,
         server = Server(
             id = "test",
+            name = "Test Server",
             country = "Test",
+            countryCode = "TT",
             city = "Test",
             flag = "",
             ping = 0,
             load = 0,
+            isOptimal = false,
+            isPremium = false,
+            isFavorite = false,
             latitude = serverLat,
             longitude = serverLng
         ),

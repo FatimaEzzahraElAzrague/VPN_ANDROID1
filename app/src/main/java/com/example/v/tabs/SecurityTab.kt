@@ -269,10 +269,10 @@ fun SplitTunnelingCard(
                                 ) {
                                     AppIcon(
                                         drawable = app.appIcon,
-                                        modifier = Modifier.size(20.dp),
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
+                                    modifier = Modifier.size(20.dp),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
                                     Column {
                                         Text(
                                             text = app.appName,
@@ -289,13 +289,13 @@ fun SplitTunnelingCard(
                                             )
                                         }
                                     }
-                                }
-                                Checkbox(
-                                    checked = isSelected,
-                                    onCheckedChange = {
-                                        selectedApps = if (isSelected) {
+                            }
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = {
+                                    selectedApps = if (isSelected) {
                                             selectedApps - app.packageName
-                                        } else {
+                                    } else {
                                             selectedApps + app.packageName
                                         }
                                     }
@@ -310,28 +310,28 @@ fun SplitTunnelingCard(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                 modifier = Modifier.padding(top = 8.dp)
                             )
-                        }
                     }
                 }
             }
         }
     }
+}
 
-    @Composable
-    fun ToggleSettingItem(
-        title: String,
-        description: String,
+@Composable
+fun ToggleSettingItem(
+    title: String,
+    description: String,
         icon: androidx.compose.ui.graphics.vector.ImageVector,
-        checked: Boolean,
-        onCheckedChange: (Boolean) -> Unit
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.weight(1f)
@@ -344,22 +344,22 @@ fun SplitTunnelingCard(
                 )
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
-                    )
-                }
-            }
-            Switch(
-                checked = checked,
-                onCheckedChange = onCheckedChange
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium
             )
+            Text(
+                text = description,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+                }
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
+        )
         }
     }
 }

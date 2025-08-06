@@ -1,149 +1,107 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VPN Map</title>
-    
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
-        html, body {
-            height: 100%;
+        body, html {
             margin: 0;
             padding: 0;
-            background: #f8f9fa;
-        }
-        
-        #map {
-            width: 100%;
             height: 100%;
-            background: transparent;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
-        
-        .user-marker {
-            width: 16px;
-            height: 16px;
-            background: #007bff;
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+        .custom-marker {
+            background-color: #FF6B35;
+            border: 3px solid white;
             border-radius: 50%;
-            border: 2px solid #ffffff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-        }
-        
-        .server-marker {
             width: 20px;
             height: 20px;
-            background: #ff6c36;
-            border-radius: 50%;
-            border: 2px solid #ffffff;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-            position: relative;
             animation: pulse 2s infinite;
         }
-        
-        .server-marker::after {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 8px;
-            height: 8px;
-            background: #ffffff;
-            border-radius: 50%;
+        .connected-marker {
+            background-color: #4CAF50;
+            animation: connectedPulse 1.5s infinite;
         }
-        
         @keyframes pulse {
-            0% { transform: scale(1); opacity: 1; }
-            50% { transform: scale(1.1); opacity: 0.8; }
-            100% { transform: scale(1); opacity: 1; }
+            0% { box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 107, 53, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 107, 53, 0); }
+        }
+        @keyframes connectedPulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 15px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
         }
     </style>
 </head>
 <body>
-    <div id="map"></div>
-    
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    
-    <script>
-        // Initialize map with proper settings
-        var map = L.map('map', {
-            zoomControl: false,
-            attributionControl: false,
-            dragging: false,
-            touchZoom: false,
-            scrollWheelZoom: false,
-            doubleClickZoom: false,
-            boxZoom: false,
-            keyboard: false
-        }).setView([20, 0], 2);
+<div id="map"></div>
 
-        // Light theme tile layer to match web UI
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-            maxZoom: 19
-        }).addTo(map);
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // Initialize map
+    const map = L.map('map', {
+        center: [30, 0],
+        zoom: 2,
+        zoomControl: false,
+        dragging: false,
+        scrollWheelZoom: false,
+        doubleClickZoom: false,
+        boxZoom: false,
+        keyboard: false,
+        tap: false,
+        attributionControl: false
+    });
 
-        // Store marker and arc references globally
-        var userMarker, serverMarker, arcLine;
+    // Add grayscale tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+        attribution: '',
+        subdomains: 'abcd',
+        maxZoom: 19
+    }).addTo(map);
 
-        function createOrUpdateMap(userLat, userLng, serverLat, serverLng) {
-            // Clear existing markers
-            if (userMarker) map.removeLayer(userMarker);
-            if (serverMarker) map.removeLayer(serverMarker);
-            if (arcLine) map.removeLayer(arcLine);
+    let currentMarker = null;
 
-            // User marker (blue circle)
-            var userIcon = L.divIcon({
-                className: '',
-                html: '<div class="user-marker"></div>',
-                iconSize: [16, 16],
-                iconAnchor: [8, 8]
-            });
-            userMarker = L.marker([userLat, userLng], { 
-                icon: userIcon,
-                title: "Your Location" 
-            }).addTo(map);
-
-            // Server marker (orange pulsing circle)
-            var serverIcon = L.divIcon({
-                className: '',
-                html: '<div class="server-marker"></div>',
-                iconSize: [20, 20],
-                iconAnchor: [10, 10]
-            });
-            serverMarker = L.marker([serverLat, serverLng], { 
-                icon: serverIcon,
-                title: "VPN Server" 
-            }).addTo(map);
-
-            // Connection line (clean, simple)
-            var connectionPoints = [
-                [userLat, userLng],
-                [serverLat, serverLng]
-            ];
-            arcLine = L.polyline(connectionPoints, { 
-                color: '#ff6c36', 
-                weight: 2, 
-                opacity: 0.7,
-                dashArray: '5,5'
-            }).addTo(map);
-
-            // Fit map to show both locations with padding
-            map.fitBounds([[userLat, userLng], [serverLat, serverLng]], {
-                padding: [50, 50]
-            });
+    // Function to update server location (called from Android)
+    function updateServerLocation(lat, lng, serverName, isConnected) {
+        // Remove existing marker
+        if (currentMarker) {
+            map.removeLayer(currentMarker);
         }
 
-        // Initial map setup
-        createOrUpdateMap(34.02, -6.84, 48.85, 2.35);
+        // Create custom marker
+        const markerElement = document.createElement('div');
+        markerElement.className = `custom-marker ${isConnected ? 'connected-marker' : ''}`;
 
-        // Expose updateMap for Android
-        function updateMap(userLat, userLng, serverLat, serverLng) {
-            console.log('updateMap called with:', userLat, userLng, serverLat, serverLng);
-            createOrUpdateMap(userLat, userLng, serverLat, serverLng);
+        const customIcon = L.divIcon({
+            html: markerElement.outerHTML,
+            className: 'custom-div-icon',
+            iconSize: [20, 20],
+            iconAnchor: [10, 10]
+        });
+
+        // Add new marker
+        currentMarker = L.marker([lat, lng], { icon: customIcon })
+            .addTo(map);
+
+        // Smooth pan to location
+        map.panTo([lat, lng], { animate: true, duration: 1.0 });
+    }
+
+    // Apply custom styling to make map more subtle
+    const style = document.createElement('style');
+    style.textContent = `
+        .leaflet-tile-pane {
+            filter: grayscale(100%) brightness(0.7) contrast(1.2);
         }
-    </script>
+    `;
+    document.head.appendChild(style);
+</script>
 </body>
 </html>

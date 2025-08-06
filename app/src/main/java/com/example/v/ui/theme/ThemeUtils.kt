@@ -153,22 +153,22 @@ fun SecondaryButton(
 }
 
 /**
- * Common card styling
+ * Common card styling - now uses fine lines instead of cards
  */
 @Composable
 fun StyledCard(
     modifier: Modifier = Modifier,
     content: @Composable () -> Unit
 ) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = getCardBackgroundColor(false).copy(alpha = 0.9f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    Column(
+        modifier = modifier
     ) {
         content()
+        HorizontalDivider(
+            modifier = Modifier.padding(top = 16.dp),
+            thickness = 0.5.dp,
+            color = getSecondaryTextColor().copy(alpha = 0.3f)
+        )
     }
 }
 

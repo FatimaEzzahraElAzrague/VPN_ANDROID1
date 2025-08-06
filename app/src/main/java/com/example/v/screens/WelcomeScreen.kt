@@ -8,7 +8,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -20,6 +19,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.painterResource
 import androidx.media3.common.util.UnstableApi
 import com.example.v.components.VideoPlayer
 import com.example.v.ui.theme.*
@@ -67,8 +67,8 @@ fun WelcomeScreen(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = "VPN Shield",
+                        painter = painterResource(id = com.example.v.R.drawable.ic_logo),
+                        contentDescription = "VPN Logo",
                         modifier = Modifier.size(64.dp),
                         tint = LightWhite
                     )

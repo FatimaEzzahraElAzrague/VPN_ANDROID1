@@ -1,40 +1,45 @@
-// components/LeafletWebView.kt
 package com.example.v.components
 
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
+import com.example.v.models.Server
 
 @Composable
 fun LeafletWebView(
-    userLat: Double,
-    userLng: Double,
-    serverLat: Double,
-    serverLng: Double,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    selectedServer: Server,
+    isConnected: Boolean
 ) {
-    val context = LocalContext.current
-
     AndroidView(
+        modifier = modifier,
         factory = { context ->
             WebView(context).apply {
+                webViewClient = WebViewClient()
                 settings.javaScriptEnabled = true
                 settings.domStorageEnabled = true
-                settings.loadWithOverviewMode = true
-                settings.useWideViewPort = true
-                webViewClient = WebViewClient()
+                settings.allowFileAccess = true
+                settings.allowContentAccess = true
 
-                // Load the HTML file from assets
-                loadUrl("file:///android_asset/vpn_map.html")
+                loadUrl("file:///android_asset/leaflet_map.html")
             }
         },
-        modifier = modifier,
         update = { webView ->
-            // Call JavaScript function to update the map when coordinates change
-            webView.loadUrl("javascript:createConnection($userLat, $userLng, $serverLat, $serverLng)")
+            // Update map with server location and connection status
+            val jsCode = """
+                if (typeof updateServerLocation === 'function') {
+                    updateServerLocation(
+                        ${selectedServer.latitude}, 
+                        ${selectedServer.longitude}, 
+                        '${selectedServer.name}',
+                        $isConnected
+                    );
+                }
+            """.trimIndent()
+
+            webView.evaluateJavascript(jsCode, null)
         }
     )
 }

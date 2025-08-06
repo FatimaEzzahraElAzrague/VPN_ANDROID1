@@ -24,12 +24,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.nativeCanvas
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -42,8 +45,13 @@ import androidx.compose.ui.platform.LocalContext
 // Import theme colors
 import com.example.v.ui.theme.*
 
-// Define colors as non-composable functions
-private val OrangeCrayola = Color(0xFFFF6B35)
+// Define SpeedTestResults data class
+data class SpeedTestResults(
+    val downloadSpeed: Float,
+    val uploadSpeed: Float,
+    val ping: Int,
+    val jitter: Int
+)
 
 private fun getSecondaryTextColor(): Color = Color.Gray
 private fun getPrimaryTextColor(isDarkTheme: Boolean): Color =
@@ -95,7 +103,7 @@ private fun PrimaryButton(
         onClick = onClick,
         modifier = modifier,
         colors = ButtonDefaults.buttonColors(
-            containerColor = OrangeCrayola,
+            containerColor = Color(0xFFFF6B35),
             contentColor = Color.White
         ),
         shape = RoundedCornerShape(8.dp)
@@ -106,6 +114,24 @@ private fun PrimaryButton(
         )
     }
 }
+
+@Composable
+private fun StyledCard(
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color.White.copy(alpha = 0.9f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+        content = { content() }
+    )
+}
+
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -396,13 +422,334 @@ private fun SettingsRow(
     }
 }
 
-data class SpeedTestResults(
-    val downloadSpeed: Float,
-    val uploadSpeed: Float,
-    val ping: Int,
-    val jitter: Int
-)
+@Composable
+private fun SpeedTestPage(
+    isDarkTheme: Boolean,
+    onBack: () -> Unit,
+    onThemeToggle: () -> Unit
+) {
+    var isRunning by remember { mutableStateOf(false) }
+    var results by remember { mutableStateOf<SpeedTestResults?>(null) }
+    var realTimeResults by remember { mutableStateOf(SpeedTestResults(0f, 0f, 0, 0)) }
+    val coroutineScope = rememberCoroutineScope()
 
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(getGradientBackground(isDarkTheme))
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "Back",
+                        tint = if (isDarkTheme) Color.White else Color.Black,
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+                Text(
+                    text = "Speed Test",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = if (isDarkTheme) Color.White else Color.Black,
+                    fontWeight = FontWeight.Bold
+                )
+                ThemeToggleButton(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle
+                )
+            }
+
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                if (isRunning) {
+                    // Show real-time speed test
+                    SpeedTestGauge(
+                        downloadSpeed = realTimeResults.downloadSpeed,
+                        uploadSpeed = realTimeResults.uploadSpeed,
+                        ping = realTimeResults.ping.toFloat(),
+                        isDarkTheme = isDarkTheme,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp),
+                        isRealTime = true
+                    )
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = "Testing Your Connection in Real-Time...",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = if (isDarkTheme) Color.White else Color.Black,
+                        fontWeight = FontWeight.Bold
+                    )
+
+                    Text(
+                        text = "Measuring download, upload, and ping speeds",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.Gray,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                } else if (results != null) {
+                    // Show results with enhanced car engine gauges
+                    SpeedTestGauge(
+                        downloadSpeed = results!!.downloadSpeed,
+                        uploadSpeed = results!!.uploadSpeed,
+                        ping = results!!.ping.toFloat(),
+                        isDarkTheme = isDarkTheme,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 24.dp)
+                    )
+
+                    // Fine line separator
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 24.dp),
+                        thickness = 0.5.dp,
+                        color = Color.Gray.copy(alpha = 0.3f)
+                    )
+
+                    // Performance analysis without card
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Connection Analysis",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = getPrimaryTextColor(isDarkTheme),
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                val connectionQuality = when {
+                                    results!!.downloadSpeed > 100f -> "Excellent"
+                                    results!!.downloadSpeed > 50f -> "Good"
+                                    results!!.downloadSpeed > 25f -> "Fair"
+                                    else -> "Poor"
+                                }
+
+                                val qualityColor = when (connectionQuality) {
+                                    "Excellent" -> Color(0xFF4CAF50)
+                                    "Good" -> Color(0xFF8BC34A)
+                                    "Fair" -> Color(0xFFFF9800)
+                                    else -> Color(0xFFF44336)
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .background(
+                                            color = qualityColor.copy(alpha = 0.1f),
+                                            shape = RoundedCornerShape(8.dp)
+                                        )
+                                        .padding(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text(
+                                        text = connectionQuality,
+                                        color = qualityColor,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 12.sp
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Server location info with car dashboard styling
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LocationOn,
+                                    contentDescription = "Server",
+                                    tint = Color(0xFFFF6B35),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Test Server: New York, USA",
+                                    color = getSecondaryTextColor(),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.AccessTime,
+                                    contentDescription = "Time",
+                                    tint = Color(0xFFFF6B35),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "Test completed at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}",
+                                    color = getSecondaryTextColor(),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(20.dp))
+
+                            // Run another test button with automotive styling
+                            PrimaryButton(
+                                onClick = {
+                                    isRunning = true
+                                    results = null
+                                    realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                    coroutineScope.launch {
+                                        // Simulate real-time speed test
+                                        for (i in 1..30) {
+                                            delay(100) // Update every 100ms
+                                            realTimeResults = SpeedTestResults(
+                                                downloadSpeed = (i * 3f + (0..15).random().toFloat()),
+                                                uploadSpeed = (i * 1f + (0..8).random().toFloat()),
+                                                ping = (15 + (0..25).random()),
+                                                jitter = (1..6).random()
+                                            )
+                                        }
+                                        // Final results
+                                        results = SpeedTestResults(
+                                            downloadSpeed = (80..150).random().toFloat(),
+                                            uploadSpeed = (20..50).random().toFloat(),
+                                            ping = (10..50).random(),
+                                            jitter = (1..10).random()
+                                        )
+                                        isRunning = false
+                                    }
+                                },
+                                text = "Run Another Test",
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                else {
+                    // Initial state - no test run yet with automotive styling
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Spacer(modifier = Modifier.height(40.dp))
+
+                        // Large speedometer icon
+                        Box(
+                            modifier = Modifier.size(120.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Canvas(modifier = Modifier.fillMaxSize()) {
+                                val center = Offset(size.width / 2f, size.height / 2f)
+                                val radius = size.minDimension / 3f
+
+                                // Draw speedometer background
+                                drawCircle(
+                                    color = Color(0xFFFF6B35).copy(alpha = 0.1f),
+                                    radius = radius + 20f,
+                                    center = center
+                                )
+
+                                drawArc(
+                                    color = Color(0xFFFF6B35).copy(alpha = 0.3f),
+                                    startAngle = 135f,
+                                    sweepAngle = 270f,
+                                    useCenter = false,
+                                    style = Stroke(width = 8.dp.toPx()),
+                                    topLeft = Offset(center.x - radius, center.y - radius),
+                                    size = Size(radius * 2, radius * 2)
+                                )
+                            }
+
+                            Icon(
+                                imageVector = Icons.Default.Speed,
+                                contentDescription = "Speed Test",
+                                tint = Color(0xFFFF6B35),
+                                modifier = Modifier.size(48.dp)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(32.dp))
+
+                        Text(
+                            text = "Speed Test Ready",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = getPrimaryTextColor(isDarkTheme),
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Text(
+                            text = "Test your connection with our automotive-grade speed measurement",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = getSecondaryTextColor(),
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(40.dp))
+
+                        PrimaryButton(
+                            onClick = {
+                                isRunning = true
+                                realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                coroutineScope.launch {
+                                    // Simulate real-time speed test
+                                    for (i in 1..30) {
+                                        delay(100) // Update every 100ms
+                                        realTimeResults = SpeedTestResults(
+                                            downloadSpeed = (i * 3f + (0..15).random().toFloat()),
+                                            uploadSpeed = (i * 1f + (0..8).random().toFloat()),
+                                            ping = (15 + (0..25).random()),
+                                            jitter = (1..6).random()
+                                        )
+                                    }
+                                    // Final results
+                                    results = SpeedTestResults(
+                                        downloadSpeed = (80..150).random().toFloat(),
+                                        uploadSpeed = (20..50).random().toFloat(),
+                                        ping = (10..50).random(),
+                                        jitter = (1..10).random()
+                                    )
+                                    isRunning = false
+                                }
+                            },
+                            text = "Start Speed Test",
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 48.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Keep all other existing functions...
 @Composable
 private fun AutoConnectPage(
     isDarkTheme: Boolean,
@@ -493,8 +840,8 @@ private fun AutoConnectPage(
                                     checked = autoConnectEnabled,
                                     onCheckedChange = { autoConnectEnabled = it },
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = OrangeCrayola,
-                                        checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                                        checkedThumbColor = Color(0xFFFF6B35),
+                                        checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
                                     )
                                 )
                             }
@@ -669,8 +1016,8 @@ private fun KillSwitchPage(
                                     checked = killSwitchEnabled,
                                     onCheckedChange = { killSwitchEnabled = it },
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = OrangeCrayola,
-                                        checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                                        checkedThumbColor = Color(0xFFFF6B35),
+                                        checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
                                     )
                                 )
                             }
@@ -802,13 +1149,13 @@ private fun SubscriptionPage(
                                 Card(
                                     shape = RoundedCornerShape(12.dp),
                                     colors = CardDefaults.cardColors(
-                                        containerColor = OrangeCrayola.copy(alpha = 0.1f)
+                                        containerColor = Color(0xFFFF6B35).copy(alpha = 0.1f)
                                     )
                                 ) {
                                     Text(
                                         text = "Active",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = OrangeCrayola,
+                                        color = Color(0xFFFF6B35),
                                         fontWeight = FontWeight.Bold,
                                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
                                     )
@@ -995,20 +1342,16 @@ private fun SplitTunnelingPage(
 ) {
     var splitTunnelingEnabled by remember { mutableStateOf(false) }
     var selectedApps by remember { mutableStateOf(setOf<String>()) }
-    var isExpanded by remember { mutableStateOf(false) }
     var showSystemApps by remember { mutableStateOf(false) }
-    var isLoadingApps by remember { mutableStateOf(true) }
+    var isLoadingApps by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val installedApps by remember {
         derivedStateOf {
             try {
-                isLoadingApps = true
                 val apps = AppUtils.getFilteredApps(context, showSystemApps)
-                isLoadingApps = false
                 apps
             } catch (e: Exception) {
-                isLoadingApps = false
                 emptyList()
             }
         }
@@ -1099,8 +1442,8 @@ private fun SplitTunnelingPage(
                                     checked = splitTunnelingEnabled,
                                     onCheckedChange = { splitTunnelingEnabled = it },
                                     colors = SwitchDefaults.colors(
-                                        checkedThumbColor = OrangeCrayola,
-                                        checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                                        checkedThumbColor = Color(0xFFFF6B35),
+                                        checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
                                     )
                                 )
                             }
@@ -1110,20 +1453,16 @@ private fun SplitTunnelingPage(
 
                 if (splitTunnelingEnabled) {
                     item {
-                        StyledCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp)
-                            ) {
                                 Text(
                                     text = "Select Apps",
                                     style = MaterialTheme.typography.titleMedium,
                                     color = getPrimaryTextColor(isDarkTheme),
-                                    fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 24.dp, bottom = 16.dp)
                                 )
-                                Spacer(modifier = Modifier.height(16.dp))
+                    }
 
+                    item {
                                 // Add filter toggle for system apps
                                 Row(
                                     modifier = Modifier
@@ -1141,12 +1480,14 @@ private fun SplitTunnelingPage(
                                         checked = showSystemApps,
                                         onCheckedChange = { showSystemApps = it },
                                         colors = SwitchDefaults.colors(
-                                            checkedThumbColor = OrangeCrayola,
-                                            checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                                            checkedThumbColor = Color(0xFFFF6B35),
+                                            checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
                                         )
                                     )
+                        }
                                 }
 
+                    item {
                                 // App count
                                 Text(
                                     text = "${installedApps.size} apps found",
@@ -1154,41 +1495,38 @@ private fun SplitTunnelingPage(
                                     color = getSecondaryTextColor(),
                                     modifier = Modifier.padding(bottom = 16.dp)
                                 )
+                    }
 
-                                LazyColumn(
-                                    modifier = Modifier.heightIn(max = 400.dp),
-                                    verticalArrangement = Arrangement.spacedBy(4.dp)
-                                ) {
                                     items(
                                         items = installedApps,
                                         key = { it.packageName }
                                     ) { app ->
                                         val isSelected = selectedApps.contains(app.packageName)
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    selectedApps = if (isSelected) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable {
+                                                selectedApps = if (isSelected) {
                                                         selectedApps - app.packageName
-                                                    } else {
+                                                } else {
                                                         selectedApps + app.packageName
-                                                    }
                                                 }
-                                                .padding(vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
+                                            }
+                                            .padding(vertical = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
                                             AppIcon(
                                                 drawable = app.appIcon,
-                                                tint = if (isSelected) OrangeCrayola else getSecondaryTextColor()
-                                            )
-                                            Spacer(modifier = Modifier.width(16.dp))
+                                            tint = if (isSelected) Color(0xFFFF6B35) else getSecondaryTextColor()
+                                        )
+                                        Spacer(modifier = Modifier.width(16.dp))
                                             Column(modifier = Modifier.weight(1f)) {
-                                                Text(
+                                        Text(
                                                     text = app.appName,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
-                                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                                )
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
+                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                        )
                                                 if (app.isSystemApp) {
                                                     Text(
                                                         text = "System App",
@@ -1198,25 +1536,21 @@ private fun SplitTunnelingPage(
                                                     )
                                                 }
                                             }
-                                            Spacer(modifier = Modifier.weight(1f))
-                                            Checkbox(
-                                                checked = isSelected,
-                                                onCheckedChange = {
-                                                    selectedApps = if (isSelected) {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        Checkbox(
+                                            checked = isSelected,
+                                            onCheckedChange = {
+                                                selectedApps = if (isSelected) {
                                                         selectedApps - app.packageName
-                                                    } else {
+                                                } else {
                                                         selectedApps + app.packageName
-                                                    }
-                                                },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = OrangeCrayola,
-                                                    uncheckedColor = getSecondaryTextColor()
-                                                )
+                                                }
+                                            },
+                                            colors = CheckboxDefaults.colors(
+                                                checkedColor = Color(0xFFFF6B35),
+                                                uncheckedColor = getSecondaryTextColor()
                                             )
-                                        }
-                                    }
-                                }
-                            }
+                                        )
                         }
                     }
                 }
@@ -1225,197 +1559,6 @@ private fun SplitTunnelingPage(
     }
 }
 
-@Composable
-private fun SpeedTestPage(
-    isDarkTheme: Boolean,
-    onBack: () -> Unit,
-    onThemeToggle: () -> Unit
-) {
-    var isRunning by remember { mutableStateOf(false) }
-    var results by remember { mutableStateOf<SpeedTestResults?>(null) }
-    val coroutineScope = rememberCoroutineScope()
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(getGradientBackground(isDarkTheme))
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 24.dp)
-        ) {
-            // Header
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.Default.ArrowBack,
-                        contentDescription = "Back",
-                        tint = getPrimaryTextColor(isDarkTheme),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-                Text(
-                    text = "Speed Test",
-                    style = MaterialTheme.typography.titleLarge,
-                    color = getPrimaryTextColor(isDarkTheme),
-                    fontWeight = FontWeight.Bold
-                )
-                ThemeToggleButton(
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle
-                )
-            }
-
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .verticalScroll(rememberScrollState()),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                if (isRunning) {
-                    // Show loading animation
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(300.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        CircularProgressIndicator(
-                            color = OrangeCrayola,
-                            modifier = Modifier.size(80.dp)
-                        )
-                    }
-                    Text(
-                        text = "Testing your connection...",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = getPrimaryTextColor(isDarkTheme),
-                        modifier = Modifier.padding(top = 16.dp)
-                    )
-                } else if (results != null) {
-                    // Show results with car engine gauges
-                    SpeedTestGauge(
-                        downloadSpeed = results!!.downloadSpeed,
-                        uploadSpeed = results!!.uploadSpeed,
-                        ping = results!!.ping.toFloat(),
-                        isDarkTheme = isDarkTheme,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 24.dp)
-                    )
-
-                    // Additional test info
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Text(
-                            text = "Test Summary",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = getPrimaryTextColor(isDarkTheme),
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-
-                        // Server location info
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.LocationOn,
-                                contentDescription = "Server",
-                                tint = getSecondaryTextColor()
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Server: New York, USA",
-                                color = getSecondaryTextColor()
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // Run another test button
-                        PrimaryButton(
-                            onClick = {
-                                isRunning = true
-                                results = null
-                                coroutineScope.launch {
-                                    delay(3000) // Simulate test
-                                    results = SpeedTestResults(
-                                        downloadSpeed = (50..150).random().toFloat(),
-                                        uploadSpeed = (10..50).random().toFloat(),
-                                        ping = (10..100).random(),
-                                        jitter = (1..10).random()
-                                    )
-                                    isRunning = false
-                                }
-                            },
-                            text = "Run Another Test",
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-                } else {
-                    // Initial state - no test run yet
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.height(40.dp))
-                        Icon(
-                            imageVector = Icons.Default.Speed,
-                            contentDescription = "Speed Test",
-                            tint = OrangeCrayola,
-                            modifier = Modifier.size(80.dp)
-                        )
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Text(
-                            text = "Test Your Connection",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = getPrimaryTextColor(isDarkTheme),
-                            fontWeight = FontWeight.Bold
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Measure your download, upload speeds and ping",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = getSecondaryTextColor(),
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 24.dp)
-                        )
-                        Spacer(modifier = Modifier.height(40.dp))
-                        PrimaryButton(
-                            onClick = {
-                                isRunning = true
-                                coroutineScope.launch {
-                                    delay(3000) // Simulate test
-                                    results = SpeedTestResults(
-                                        downloadSpeed = (50..150).random().toFloat(),
-                                        uploadSpeed = (10..50).random().toFloat(),
-                                        ping = (10..100).random(),
-                                        jitter = (1..10).random()
-                                    )
-                                    isRunning = false
-                                }
-                            },
-                            text = "Start Test",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 48.dp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 @Composable
 private fun RadioOption(
     text: String,
@@ -1435,7 +1578,7 @@ private fun RadioOption(
             onClick = onSelect,
             enabled = enabled,
             colors = RadioButtonDefaults.colors(
-                selectedColor = OrangeCrayola,
+                selectedColor = Color(0xFFFF6B35),
                 unselectedColor = if (enabled) getSecondaryTextColor() else getSecondaryTextColor().copy(alpha = 0.5f)
             )
         )
@@ -1462,7 +1605,7 @@ private fun StepItem(
                 .size(24.dp)
                 .background(
                     brush = Brush.radialGradient(
-                        colors = listOf(OrangeCrayola.copy(alpha = 0.2f), Color.Transparent)
+                        colors = listOf(Color(0xFFFF6B35).copy(alpha = 0.2f), Color.Transparent)
                     ),
                     shape = CircleShape
                 ),
@@ -1471,7 +1614,7 @@ private fun StepItem(
             Text(
                 text = number.toString(),
                 style = MaterialTheme.typography.bodySmall,
-                color = OrangeCrayola,
+                color = Color(0xFFFF6B35),
                 fontWeight = FontWeight.Bold
             )
         }
@@ -1518,65 +1661,9 @@ private fun SecurityOption(
             checked = isEnabled,
             onCheckedChange = onToggle,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = OrangeCrayola,
-                checkedTrackColor = OrangeCrayola.copy(alpha = 0.5f)
+                checkedThumbColor = Color(0xFFFF6B35),
+                checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
             )
         )
-    }
-}
-
-@Composable
-private fun SpeedMetricCard(
-    title: String,
-    value: String,
-    unit: String,
-    color: Color,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    isDarkTheme: Boolean,
-    modifier: Modifier = Modifier
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = getCardBackgroundColor(isDarkTheme).copy(alpha = 0.8f)
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = title,
-                tint = color,
-                modifier = Modifier.size(24.dp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = value,
-                style = MaterialTheme.typography.titleLarge,
-                color = color,
-                fontWeight = FontWeight.Bold
-            )
-
-            Text(
-                text = unit,
-                style = MaterialTheme.typography.bodySmall,
-                color = getSecondaryTextColor()
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                color = getPrimaryTextColor(isDarkTheme),
-                fontWeight = FontWeight.Medium
-            )
-        }
     }
 }

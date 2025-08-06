@@ -11,6 +11,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -19,9 +20,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import com.example.v.models.Server
 import com.example.v.screens.*
 import com.example.v.data.ServersData
+import com.example.v.config.VPNConfig
+import com.example.v.vpn.VPNManager
+import com.example.v.vpn.VPNConnectionState
 import com.example.v.ui.theme.*
 
 @Composable
@@ -32,18 +37,51 @@ fun VPNNavigation(
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var selectedServer by remember { mutableStateOf<Server?>(null) }
+    var connectedServer by remember { mutableStateOf<Server?>(null) }
     var showServersScreen by remember { mutableStateOf(false) }
+    var servers by remember { mutableStateOf(ServersData.servers) }
     val tabs = listOf("Home", "AI Analyzer", "Settings")
+    
+    // Get VPN Manager instance
+    val context = LocalContext.current
+    val vpnManager = remember { VPNManager.getInstance(context) }
+    
+    // Observe VPN connection state
+    val connectionState by vpnManager.connectionState.observeAsState(initial = VPNConnectionState.DISCONNECTED)
+    val currentServer by vpnManager.currentServer.observeAsState(initial = null)
+    
+    // Update connected server based on VPN manager state
+    LaunchedEffect(connectionState, currentServer) {
+        when (connectionState) {
+            VPNConnectionState.CONNECTED -> {
+                connectedServer = currentServer
+            }
+            VPNConnectionState.DISCONNECTED -> {
+                connectedServer = null
+            }
+            else -> {
+                // Keep current state for CONNECTING/DISCONNECTING
+            }
+        }
+    }
     
     if (showServersScreen) {
         ServersScreen(
-            servers = ServersData.servers,
+            servers = servers,
             selectedServer = selectedServer,
+            connectedServer = connectedServer,
             isDarkTheme = isDarkTheme,
             onThemeToggle = onThemeToggle,
             onServerSelect = { server -> 
                 selectedServer = server
+                // Connect to the selected server using VPN Manager
+                vpnManager.connect(server)
                 showServersScreen = false
+            },
+            onServerFavorite = { server ->
+                servers = servers.map { 
+                    if (it.id == server.id) it.copy(isFavorite = !it.isFavorite) else it 
+                }
             },
             onBackClick = { showServersScreen = false }
         )
@@ -90,52 +128,49 @@ fun VPNNavigation(
                                 Text(
                                     text = title,
                                     color = if (selectedTab == index) OrangeCrayola else getSecondaryTextColor(),
-                                    style = MaterialTheme.typography.labelSmall,
+                                    fontSize = 12.sp,
                                     fontWeight = if (selectedTab == index) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
                             selected = selectedTab == index,
-                            onClick = { selectedTab = index },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = OrangeCrayola,
-                                selectedTextColor = OrangeCrayola,
-                                unselectedIconColor = getSecondaryTextColor(),
-                                unselectedTextColor = getSecondaryTextColor(),
-                                indicatorColor = Color.Transparent
-                            )
+                            onClick = { selectedTab = index }
                         )
                     }
                 }
             }
-        ) { paddingValues ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(paddingValues)
-            ) {
-                when (selectedTab) {
-                    0 -> HomeScreen(
-                        currentServer = selectedServer ?: ServersData.getOptimalServer() ?: ServersData.servers.first(),
-                        onServerChange = { showServersScreen = true },
-                        onNavigate = { route -> 
-                            when (route) {
-                                "analyzer" -> selectedTab = 1
-                                "settings" -> selectedTab = 2
-                            }
-                        }
-                    )
-                    1 -> AIAnalyzerScreen(
-                        isDarkTheme = isDarkTheme,
-                        onThemeToggle = onThemeToggle
-                    )
-                    2 -> SettingsScreen(
-                        isDarkTheme = isDarkTheme,
-                        onThemeToggle = onThemeToggle,
-                        onSignOut = onSignOut
-                    )
-                }
-            }
-        }
+                 ) { paddingValues ->
+             Box(
+                 modifier = Modifier.padding(paddingValues)
+             ) {
+                 when (selectedTab) {
+                                      0 -> HomeScreen(
+                     currentServer = selectedServer ?: VPNConfig.defaultServer,
+                     connectedServer = connectedServer,
+                     onServerChange = { showServersScreen = true },
+                     onNavigate = { route ->
+                         when (route) {
+                             "servers" -> showServersScreen = true
+                         }
+                     },
+                     onDisconnect = { 
+                         vpnManager.disconnect()
+                     },
+                     isDarkTheme = isDarkTheme,
+                     onThemeToggle = onThemeToggle,
+                     vpnManager = vpnManager
+                 )
+                     1 -> AIAnalyzerScreen(
+                         isDarkTheme = isDarkTheme,
+                         onThemeToggle = onThemeToggle
+                     )
+                     2 -> SettingsScreen(
+                         isDarkTheme = isDarkTheme,
+                         onThemeToggle = onThemeToggle,
+                         onSignOut = onSignOut
+                     )
+                 }
+             }
+         }
     }
 }
 

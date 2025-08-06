@@ -57,7 +57,7 @@ fun AIAnalyzerScreen(
             // Status bar spacer
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Top bar with theme toggle and title
+            // Top bar with title and theme toggle
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -65,20 +65,17 @@ fun AIAnalyzerScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Theme toggle button
-                ThemeToggleButton(
-                    isDarkTheme = isDarkTheme,
-                    onThemeToggle = onThemeToggle
-                )
-
                 // App title
                 TitleText(
                     text = "AI Analyzer",
                     isDarkTheme = isDarkTheme
                 )
 
-                // Spacer to balance the layout
-                Spacer(modifier = Modifier.size(48.dp))
+                // Theme toggle button
+                ThemeToggleButton(
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle
+                )
             }
 
             Spacer(modifier = Modifier.weight(1f))
