@@ -1,6 +1,7 @@
 package com.example.v.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -13,9 +14,18 @@ import com.example.v.screens.WelcomeScreen
 fun AuthNavigation(
     onAuthSuccess: () -> Unit,
     isDarkTheme: Boolean,
-    onThemeToggle: () -> Unit
+    onThemeToggle: () -> Unit,
+    onGoogleSignInRequest: () -> Unit = {},
+    exposeNavigateToSignIn: ((() -> Unit) -> Unit) = {}
 ) {
     val navController = rememberNavController()
+
+    // Expose a function that navigates to the sign-in screen
+    LaunchedEffect(Unit) {
+        exposeNavigateToSignIn {
+            navController.navigate("signin")
+        }
+    }
 
     NavHost(
         navController = navController,
@@ -44,7 +54,8 @@ fun AuthNavigation(
                     navController.navigate("email_activation/$email")
                 },
                 onSignInClick = { navController.navigate("signin") },
-                onBackClick = { navController.popBackStack() }
+                onBackClick = { navController.popBackStack() },
+                onGoogleSignInRequest = onGoogleSignInRequest
             )
         }
         composable("email_activation/{email}") { backStackEntry ->

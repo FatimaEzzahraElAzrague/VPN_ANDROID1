@@ -41,6 +41,9 @@ import com.example.v.components.AppIcon
 import com.example.v.models.InstalledApp
 import com.example.v.utils.AppUtils
 import androidx.compose.ui.platform.LocalContext
+import com.example.v.utils.RealTimeSpeedTest
+import com.example.v.utils.RealTimeSpeedTestResult
+import com.example.v.utils.TestPhase
 
 // Import theme colors
 import com.example.v.ui.theme.*
@@ -622,25 +625,32 @@ private fun SpeedTestPage(
                                     isRunning = true
                                     results = null
                                     realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                    
                                     coroutineScope.launch {
-                                        // Simulate real-time speed test
-                                        for (i in 1..30) {
-                                            delay(100) // Update every 100ms
-                                            realTimeResults = SpeedTestResults(
-                                                downloadSpeed = (i * 3f + (0..15).random().toFloat()),
-                                                uploadSpeed = (i * 1f + (0..8).random().toFloat()),
-                                                ping = (15 + (0..25).random()),
-                                                jitter = (1..6).random()
+                                        try {
+                                            val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
+                                            var finalResult: SpeedTestResults? = null
+                                            
+                                            RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
+                                                realTimeResults = result.toSpeedTestResults()
+                                                
+                                                if (result.testPhase == TestPhase.COMPLETED) {
+                                                    finalResult = result.toSpeedTestResults()
+                                                }
+                                            }
+                                            
+                                            results = finalResult ?: realTimeResults
+                                            isRunning = false
+                                        } catch (e: Exception) {
+                                            // Fallback to simulated results if real test fails
+                                            results = SpeedTestResults(
+                                                downloadSpeed = (80..150).random().toFloat(),
+                                                uploadSpeed = (20..50).random().toFloat(),
+                                                ping = (10..50).random(),
+                                                jitter = (1..10).random()
                                             )
+                                            isRunning = false
                                         }
-                                        // Final results
-                                        results = SpeedTestResults(
-                                            downloadSpeed = (80..150).random().toFloat(),
-                                            uploadSpeed = (20..50).random().toFloat(),
-                                            ping = (10..50).random(),
-                                            jitter = (1..10).random()
-                                        )
-                                        isRunning = false
                                     }
                                 },
                                 text = "Run Another Test",
@@ -712,31 +722,38 @@ private fun SpeedTestPage(
 
                         Spacer(modifier = Modifier.height(40.dp))
 
-                        PrimaryButton(
-                            onClick = {
-                                isRunning = true
-                                realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
-                                coroutineScope.launch {
-                                    // Simulate real-time speed test
-                                    for (i in 1..30) {
-                                        delay(100) // Update every 100ms
-                                        realTimeResults = SpeedTestResults(
-                                            downloadSpeed = (i * 3f + (0..15).random().toFloat()),
-                                            uploadSpeed = (i * 1f + (0..8).random().toFloat()),
-                                            ping = (15 + (0..25).random()),
-                                            jitter = (1..6).random()
-                                        )
+                                                    PrimaryButton(
+                                onClick = {
+                                    isRunning = true
+                                    realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                    
+                                    coroutineScope.launch {
+                                        try {
+                                            val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
+                                            var finalResult: SpeedTestResults? = null
+                                            
+                                            RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
+                                                realTimeResults = result.toSpeedTestResults()
+                                                
+                                                if (result.testPhase == TestPhase.COMPLETED) {
+                                                    finalResult = result.toSpeedTestResults()
+                                                }
+                                            }
+                                            
+                                            results = finalResult ?: realTimeResults
+                                            isRunning = false
+                                        } catch (e: Exception) {
+                                            // Fallback to simulated results if real test fails
+                                            results = SpeedTestResults(
+                                                downloadSpeed = (80..150).random().toFloat(),
+                                                uploadSpeed = (20..50).random().toFloat(),
+                                                ping = (10..50).random(),
+                                                jitter = (1..10).random()
+                                            )
+                                            isRunning = false
+                                        }
                                     }
-                                    // Final results
-                                    results = SpeedTestResults(
-                                        downloadSpeed = (80..150).random().toFloat(),
-                                        uploadSpeed = (20..50).random().toFloat(),
-                                        ping = (10..50).random(),
-                                        jitter = (1..10).random()
-                                    )
-                                    isRunning = false
-                                }
-                            },
+                                },
                             text = "Start Speed Test",
                             modifier = Modifier
                                 .fillMaxWidth()

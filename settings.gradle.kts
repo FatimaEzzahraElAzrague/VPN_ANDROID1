@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "v"
 include(":app")
+include(":backend")

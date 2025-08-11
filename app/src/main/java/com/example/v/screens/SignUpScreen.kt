@@ -21,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.v.components.GoogleSignInButton
 import com.example.v.ui.theme.*
+import com.example.v.data.ApiClient
+import com.example.v.data.SignupRequest
+import com.example.v.services.GoogleSignInService
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -30,7 +33,8 @@ fun SignUpScreen(
     onThemeToggle: () -> Unit,
     onSignUpSuccess: (String) -> Unit,
     onSignInClick: () -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onGoogleSignInRequest: () -> Unit
 ) {
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -263,11 +267,22 @@ fun SignUpScreen(
                         return@PrimaryButton
                     }
                     isLoading = true
-                    // Simulate API call
+                    // Real API call
                     kotlinx.coroutines.GlobalScope.launch {
-                        kotlinx.coroutines.delay(2000)
-                        isLoading = false
-                        onSignUpSuccess(email)
+                        try {
+                            val request = SignupRequest(
+                                email = email,
+                                password = password,
+                                username = email.split("@")[0], // Use email prefix as username
+                                fullName = name
+                            )
+                            val response = ApiClient.signup(request)
+                            isLoading = false
+                            onSignUpSuccess(email)
+                        } catch (e: Exception) {
+                            isLoading = false
+                            errorMessage = "Signup failed: ${e.message}"
+                        }
                     }
                 },
                 text = "Create Account",
@@ -302,12 +317,7 @@ fun SignUpScreen(
             GoogleSignInButton(
                 onClick = {
                     isLoading = true
-                    // Simulate Google sign up
-                    kotlinx.coroutines.GlobalScope.launch {
-                        kotlinx.coroutines.delay(2000)
-                        isLoading = false
-                        onSignUpSuccess("google@example.com")
-                    }
+                    onGoogleSignInRequest()
                 },
                 enabled = !isLoading
             )

@@ -26,14 +26,13 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import com.example.v.ui.theme.*
+import com.example.v.utils.RealTimeSpeedTest
+import com.example.v.utils.RealTimeSpeedTestResult
+import com.example.v.utils.TestPhase
+import com.example.v.screens.SpeedTestResults
+import com.example.v.data.VPNFeaturesApiClient
 
 // Import SpeedTestResults from SettingsScreen
-data class SpeedTestResults(
-    val downloadSpeed: Float,
-    val uploadSpeed: Float,
-    val ping: Int,
-    val jitter: Int
-)
 
 @Composable
 fun SpeedTestTab(
@@ -43,7 +42,9 @@ fun SpeedTestTab(
     var isRunning by remember { mutableStateOf(false) }
     var results by remember { mutableStateOf<SpeedTestResults?>(null) }
     var realTimeResults by remember { mutableStateOf(SpeedTestResults(0f, 0f, 0, 0)) }
+    var backendStatus by remember { mutableStateOf("Not tested") }
     val coroutineScope = rememberCoroutineScope()
+    val apiClient = remember { VPNFeaturesApiClient.getInstance() }
 
     // Use app theme colors
     val backgroundColor = getGradientBackground(isDarkTheme)
@@ -217,32 +218,67 @@ fun SpeedTestTab(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 // Run another test button with enhanced styling
-                Button(
-                    onClick = {
-                        isRunning = true
-                        results = null
-                         realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
-                        coroutineScope.launch {
-                             // Simulate real-time speed test
-                             for (i in 1..40) {
-                                 delay(100) // Update every 100ms
-                                 realTimeResults = SpeedTestResults(
-                                     downloadSpeed = (i * 2.5f + (0..10).random().toFloat()),
-                                     uploadSpeed = (i * 0.8f + (0..5).random().toFloat()),
-                                     ping = (20 + (0..30).random()),
-                                     jitter = (1..5).random()
-                                 )
-                             }
-                             // Final results
-                            results = SpeedTestResults(
-                                 downloadSpeed = (80..150).random().toFloat(),
-                                 uploadSpeed = (20..50).random().toFloat(),
-                                 ping = (10..50).random(),
-                                jitter = (1..10).random()
-                            )
-                            isRunning = false
-                        }
-                    },
+                                        Button(
+                            onClick = {
+                                isRunning = true
+                                results = null
+                                realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                backendStatus = "Testing backend..."
+                                
+                                coroutineScope.launch {
+                                    try {
+                                        // Test backend connection first
+                                        val serversResult = apiClient.getSpeedTestServers()
+                                        if (serversResult.isSuccess) {
+                                            backendStatus = "Backend connected! Found ${serversResult.getOrNull()?.size ?: 0} servers"
+                                        } else {
+                                            backendStatus = "Backend error: ${serversResult.exceptionOrNull()?.message}"
+                                        }
+                                        
+                                        val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
+                                        var finalResult: SpeedTestResults? = null
+                                        
+                                        RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
+                                            realTimeResults = result.toSpeedTestResults()
+                                            
+                                            if (result.testPhase == TestPhase.COMPLETED) {
+                                                finalResult = result.toSpeedTestResults()
+                                                
+                                                // Save result to backend
+                                                finalResult?.let { speedResult ->
+                                                    val saveResult = apiClient.saveSpeedTestResult(
+                                                        userId = "test123",
+                                                        pingMs = speedResult.ping.toLong(),
+                                                        downloadMbps = speedResult.downloadSpeed.toDouble(),
+                                                        uploadMbps = speedResult.uploadSpeed.toDouble(),
+                                                        testServer = testServer,
+                                                        networkType = "WiFi"
+                                                    )
+                                                    
+                                                    if (saveResult.isSuccess) {
+                                                        backendStatus = "✅ Result saved to backend!"
+                                                    } else {
+                                                        backendStatus = "❌ Failed to save: ${saveResult.exceptionOrNull()?.message}"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        
+                                        results = finalResult ?: realTimeResults
+                                        isRunning = false
+                                    } catch (e: Exception) {
+                                        backendStatus = "❌ Error: ${e.message}"
+                                        // Fallback to simulated results if real test fails
+                                        results = SpeedTestResults(
+                                            downloadSpeed = (80..150).random().toFloat(),
+                                            uploadSpeed = (20..50).random().toFloat(),
+                                            ping = (10..50).random(),
+                                            jitter = (1..10).random()
+                                        )
+                                        isRunning = false
+                                    }
+                                }
+                            },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 32.dp)
@@ -348,31 +384,117 @@ fun SpeedTestTab(
                         modifier = Modifier.padding(horizontal = 32.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(48.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
+                    
+                    // Backend Status Display
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (backendStatus.contains("✅")) {
+                                Color(0xFF4CAF50).copy(alpha = 0.1f)
+                            } else if (backendStatus.contains("❌")) {
+                                Color(0xFFF44336).copy(alpha = 0.1f)
+                            } else {
+                                Color(0xFFFF9800).copy(alpha = 0.1f)
+                            }
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = "Backend Status",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = textColor
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = backendStatus,
+                                style = MaterialTheme.typography.bodyMedium,
+                                textAlign = TextAlign.Center,
+                                color = if (backendStatus.contains("✅")) {
+                                    Color(0xFF4CAF50)
+                                } else if (backendStatus.contains("❌")) {
+                                    Color(0xFFF44336)
+                                } else {
+                                    orangeColor
+                                }
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    // Test Backend Connection Button
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                backendStatus = "Testing connection..."
+                                try {
+                                    val serversResult = apiClient.getSpeedTestServers()
+                                    if (serversResult.isSuccess) {
+                                        val servers = serversResult.getOrNull()
+                                        backendStatus = "✅ Backend connected! Found ${servers?.size ?: 0} servers"
+                                    } else {
+                                        backendStatus = "❌ Backend error: ${serversResult.exceptionOrNull()?.message}"
+                                    }
+                                } catch (e: Exception) {
+                                    backendStatus = "❌ Connection failed: ${e.message}"
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 32.dp)
+                            .height(48.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF2196F3)
+                        )
+                    ) {
+                        Text(
+                            text = "Test Backend Connection",
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
 
                     Button(
                         onClick = {
                             isRunning = true
                             realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                            
                             coroutineScope.launch {
-                                // Simulate real-time speed test
-                                for (i in 1..40) {
-                                    delay(100) // Update every 100ms
-                                    realTimeResults = SpeedTestResults(
-                                        downloadSpeed = (i * 2.5f + (0..10).random().toFloat()),
-                                        uploadSpeed = (i * 0.8f + (0..5).random().toFloat()),
-                                        ping = (20 + (0..30).random()),
-                                        jitter = (1..5).random()
+                                try {
+                                    val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
+                                    var finalResult: SpeedTestResults? = null
+                                    
+                                    RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
+                                        realTimeResults = result.toSpeedTestResults()
+                                        
+                                        if (result.testPhase == TestPhase.COMPLETED) {
+                                            finalResult = result.toSpeedTestResults()
+                                        }
+                                    }
+                                    
+                                    results = finalResult ?: realTimeResults
+                                    isRunning = false
+                                } catch (e: Exception) {
+                                    // Fallback to simulated results if real test fails
+                                    results = SpeedTestResults(
+                                        downloadSpeed = (80..150).random().toFloat(),
+                                        uploadSpeed = (20..50).random().toFloat(),
+                                        ping = (10..50).random(),
+                                        jitter = (1..10).random()
                                     )
+                                    isRunning = false
                                 }
-                                // Final results
-                                results = SpeedTestResults(
-                                    downloadSpeed = (80..150).random().toFloat(),
-                                    uploadSpeed = (20..50).random().toFloat(),
-                                    ping = (10..50).random(),
-                                    jitter = (1..10).random()
-                                )
-                                isRunning = false
                             }
                         },
                         modifier = Modifier

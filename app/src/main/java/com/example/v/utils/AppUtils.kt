@@ -59,7 +59,7 @@ object AppUtils {
         }
     }
     
-    fun getFilteredApps(context: Context, showSystemApps: Boolean = false): List<InstalledApp> {
+    fun getFilteredApps(context: Context, showSystemApps: Boolean = true): List<InstalledApp> {
         val allApps = getInstalledApps(context)
         return if (showSystemApps) {
             allApps
