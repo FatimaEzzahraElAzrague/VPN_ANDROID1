@@ -3,20 +3,25 @@ package com.example.v.vpn
 import android.content.Context
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import android.util.Log
+import androidx.annotation.RequiresApi
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.v.config.VPNConfig
 import com.example.v.models.ClientConfig
 import com.example.v.models.Server
+import com.example.v.vpn.WireGuardVpnService
+import com.example.v.utils.IPChecker
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.security.SecureRandom
-import java.util.*
 
 /**
  * VPN Manager class to handle VPN connections and state management
- * Note: This is a mock implementation for demonstration purposes
- * In production, integrate with actual WireGuard library
+ * Integrates with real WireGuard GoBackend for production-ready VPN functionality
  */
 class VPNManager(private val context: Context) {
     
@@ -27,17 +32,21 @@ class VPNManager(private val context: Context) {
         private var INSTANCE: VPNManager? = null
         
         fun getInstance(context: Context): VPNManager {
+            Log.d(TAG, "🔍 DEBUG: getInstance called, INSTANCE = $INSTANCE")
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: VPNManager(context.applicationContext).also { INSTANCE = it }
+                INSTANCE ?: VPNManager(context.applicationContext).also { 
+                    INSTANCE = it 
+                    Log.d(TAG, "🔍 DEBUG: Created new VPNManager instance")
+                }
             }
         }
     }
     
-    private val _connectionState = MutableLiveData<VPNConnectionState>()
-    val connectionState: LiveData<VPNConnectionState> = _connectionState
+    private val _connectionState = MutableStateFlow(VPNConnectionState.DISCONNECTED)
+    val connectionState: StateFlow<VPNConnectionState> = _connectionState.asStateFlow()
     
-    private val _currentServer = MutableLiveData<Server?>()
-    val currentServer: LiveData<Server?> = _currentServer
+    private val _currentServer = MutableStateFlow<Server?>(null)
+    val currentServer: StateFlow<Server?> = _currentServer.asStateFlow()
     
     private val _statistics = MutableLiveData<VPNStatistics>()
     val statistics: LiveData<VPNStatistics> = _statistics
@@ -45,9 +54,13 @@ class VPNManager(private val context: Context) {
     private val managerScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     
     private var clientConfig: ClientConfig? = null
+    private val _clientConfigFlow = MutableStateFlow<ClientConfig?>(null)
+    val clientConfigFlow: StateFlow<ClientConfig?> = _clientConfigFlow.asStateFlow()
     
     init {
+        Log.d(TAG, "🔍 DEBUG: VPNManager initialized")
         _connectionState.value = VPNConnectionState.DISCONNECTED
+        Log.d(TAG, "🔍 DEBUG: Initial connection state: ${_connectionState.value}")
         startStatisticsUpdater()
     }
     
@@ -55,8 +68,11 @@ class VPNManager(private val context: Context) {
      * Check if VPN permission is granted
      */
     fun hasVpnPermission(): Boolean {
+        // Check if VPN permission is already granted by trying to prepare
         val intent = VpnService.prepare(context)
-        Log.d(TAG, "VPN permission check: ${intent == null}")
+        Log.d(TAG, "VPN permission check: intent = $intent")
+        // If intent is null, permission is already granted
+        // If intent is not null, permission needs to be requested
         return intent == null
     }
     
@@ -72,21 +88,35 @@ class VPNManager(private val context: Context) {
     /**
      * Connect to VPN server
      */
+    @RequiresApi(Build.VERSION_CODES.O)
     fun connect(server: Server) {
-        Log.d(TAG, "Connect requested for server: ${server.name}")
+        Log.d(TAG, "🔍 DEBUG: ===============================")
+        Log.d(TAG, "🔍 DEBUG: STARTING VPN CONNECTION PROCESS")
+        Log.d(TAG, "🔍 DEBUG: ===============================")
+        Log.d(TAG, "🔍 DEBUG: Connect requested for server: ${server.name}")
+        Log.d(TAG, "🔍 DEBUG: Current connection state: ${_connectionState.value}")
+        Log.d(TAG, "🔍 DEBUG: Server ID: ${server.id}")
+        Log.d(TAG, "🔍 DEBUG: Server endpoint: ${server.wireGuardConfig?.serverEndpoint}")
+        Log.d(TAG, "🔍 DEBUG: Server port: ${server.wireGuardConfig?.serverPort}")
         
         if (_connectionState.value == VPNConnectionState.CONNECTED || 
             _connectionState.value == VPNConnectionState.CONNECTING) {
-            Log.w(TAG, "VPN is already connected or connecting")
+            Log.w(TAG, "❌ VPN is already connected or connecting - aborting")
             return
         }
         
         // Check VPN permission first
-        if (!hasVpnPermission()) {
-            Log.e(TAG, "VPN permission not granted - need to request permission")
+        Log.d(TAG, "🔍 DEBUG: Checking VPN permission...")
+        val hasPermission = hasVpnPermission()
+        Log.d(TAG, "🔍 DEBUG: VPN permission check result: $hasPermission")
+        
+        if (!hasPermission) {
+            Log.e(TAG, "❌ VPN permission not granted - need to request permission")
             _connectionState.value = VPNConnectionState.ERROR
             return
         }
+        
+        Log.d(TAG, "✅ VPN permission granted - proceeding with connection")
         
         _connectionState.value = VPNConnectionState.CONNECTING
         _currentServer.value = server
@@ -96,38 +126,58 @@ class VPNManager(private val context: Context) {
         
         managerScope.launch {
             try {
-                // Use real client configuration for Paris server
-                if (clientConfig == null) {
-                    clientConfig = if (server.id == "france-paris") {
+                // Get client configuration based on server
+                clientConfig = when (server.id) {
+                    "france-paris" -> {
                         Log.d(TAG, "Using Paris client config")
                         VPNConfig.parisClientConfig
-                    } else {
-                        Log.d(TAG, "Generating mock client config")
-                        generateClientConfig()
+                    }
+                    "asia-pacific-osaka" -> {
+                        Log.d(TAG, "Using Osaka client config")
+                        VPNConfig.osakaClientConfig
+                    }
+                    else -> {
+                        Log.e(TAG, "Unknown server ID: ${server.id}")
+                        _connectionState.value = VPNConnectionState.ERROR
+                        return@launch
                     }
                 }
                 
                 // Save connection state for auto-connect
                 saveConnectionState(server, clientConfig!!)
+                _clientConfigFlow.value = clientConfig
                 
-                // Start real WireGuard VPN service
+                // Start WireGuard VPN service (GoBackend needs a VpnService context)
+                Log.d(TAG, "🔍 DEBUG: Preparing to start WireGuard VPN service (GoBackend requires VpnService context)...")
                 val intent = Intent(context, WireGuardVpnService::class.java).apply {
                     action = WireGuardVpnService.ACTION_CONNECT
                     putExtra("server", server)
                     putExtra("client_config", clientConfig!!)
                 }
                 
-                Log.d(TAG, "Starting WireGuard VPN service...")
-                context.startForegroundService(intent)
+                Log.d(TAG, "🔍 DEBUG: Intent created with action: ${intent.action}")
+                Log.d(TAG, "🔍 DEBUG: Server passed to service: ${server.name}")
+                Log.d(TAG, "🔍 DEBUG: Client config passed to service: ${clientConfig?.privateKey?.take(10)}...")
                 
-                // Monitor connection status
+                Log.d(TAG, "🔍 DEBUG: Starting foreground service...")
+                try {
+                    val result = context.startForegroundService(intent)
+                    Log.d(TAG, "✅ WireGuard VPN service started successfully, result: $result")
+                } catch (e: Exception) {
+                    Log.e(TAG, "❌ Failed to start WireGuard VPN service", e)
+                    _connectionState.value = VPNConnectionState.ERROR
+                    return@launch
+                }
+
+                // Monitor connection status reported by the service
                 var attempts = 0
                 while (attempts < 30) { // Wait up to 30 seconds
                     delay(1000)
-                    Log.d(TAG, "Checking VPN connection status... attempt ${attempts + 1}")
-                    if (WireGuardVpnService.isVpnConnected()) {
+                    val isServiceConnected = WireGuardVpnService.isVpnConnected()
+                    Log.d(TAG, "Checking VPN connection status... attempt ${attempts + 1}/30, service connected: $isServiceConnected")
+                    if (isServiceConnected) {
                         _connectionState.value = VPNConnectionState.CONNECTED
-                        Log.d(TAG, "Real VPN connected to ${server.city}, ${server.country}")
+                        Log.d(TAG, "VPN connected to ${server.city}, ${server.country}")
                         return@launch
                     }
                     attempts++
@@ -159,17 +209,18 @@ class VPNManager(private val context: Context) {
         
         managerScope.launch {
             try {
-                // Send disconnect intent to service
+                // Send disconnect intent to service so GoBackend can tear down its tunnel
                 val intent = Intent(context, WireGuardVpnService::class.java).apply {
                     action = WireGuardVpnService.ACTION_DISCONNECT
                 }
                 context.startService(intent)
-                
-                // Simulate disconnection delay
+
+                // Small delay to allow teardown
                 delay(1000)
-                
+
                 // Clear connection state
                 clearConnectionState()
+                _clientConfigFlow.value = null
                 
                 _connectionState.value = VPNConnectionState.DISCONNECTED
                 _currentServer.value = null
@@ -193,10 +244,10 @@ class VPNManager(private val context: Context) {
         random.nextBytes(privateKeyBytes)
         
         // Create mock keys (in real implementation, use actual WireGuard Key class)
-        val privateKeyBase64 = Base64.getEncoder().encodeToString(privateKeyBytes)
-        val publicKeyBase64 = Base64.getEncoder().encodeToString(ByteArray(32).apply { 
+        val privateKeyBase64 = android.util.Base64.encodeToString(privateKeyBytes, android.util.Base64.NO_WRAP)
+        val publicKeyBase64 = android.util.Base64.encodeToString(ByteArray(32).apply { 
             random.nextBytes(this) 
-        })
+        }, android.util.Base64.NO_WRAP)
         
         return ClientConfig(
             privateKey = privateKeyBase64,
@@ -246,6 +297,16 @@ class VPNManager(private val context: Context) {
      */
     private fun serializeClientConfig(config: ClientConfig): String {
         return "${config.privateKey}|${config.publicKey}|${config.address}|${config.dns}"
+    }
+
+    /**
+     * Get the local tunnel IPv4 address (without CIDR), if available
+     */
+    fun getLocalTunnelIpv4(): String? {
+        val addressList = clientConfig?.address ?: return null
+        val first = addressList.split(',').firstOrNull()?.trim() ?: return null
+        val ip = first.substringBefore('/')
+        return if (ip.isNotBlank()) ip else null
     }
     
     /**
@@ -396,6 +457,52 @@ class VPNManager(private val context: Context) {
             // Fallback to time-based calculation
             val connectionTime = System.currentTimeMillis() - (_statistics.value?.connectionDuration ?: System.currentTimeMillis())
             (connectionTime / 1000) * 5 // 5 packets per second average
+        }
+    }
+    
+    /**
+     * Verify VPN connection by checking if IP address has changed
+     * This is the ultimate test to confirm VPN is working
+     */
+    fun verifyVPNConnection(originalIP: String? = null, callback: (Boolean, String?) -> Unit) {
+        Log.d(TAG, "🔍 DEBUG: Verifying VPN connection by checking IP change...")
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // Get current IP
+                val currentIP = IPChecker.getCurrentIP()
+                
+                if (currentIP != null) {
+                    val isWorking = if (originalIP != null) {
+                        currentIP != originalIP
+                    } else {
+                        // If no original IP provided, just return the current IP
+                        true
+                    }
+                    
+                    withContext(Dispatchers.Main) {
+                        callback(isWorking, currentIP)
+                    }
+                    
+                    if (isWorking && originalIP != null) {
+                        Log.d(TAG, "✅ VPN VERIFICATION PASSED: IP changed from $originalIP to $currentIP")
+                    } else if (originalIP != null) {
+                        Log.w(TAG, "❌ VPN VERIFICATION FAILED: IP unchanged ($currentIP)")
+                    } else {
+                        Log.d(TAG, "🔍 Current IP: $currentIP")
+                    }
+                } else {
+                    Log.e(TAG, "❌ Failed to get current IP for verification")
+                    withContext(Dispatchers.Main) {
+                        callback(false, null)
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error verifying VPN connection", e)
+                withContext(Dispatchers.Main) {
+                    callback(false, null)
+                }
+            }
         }
     }
 }

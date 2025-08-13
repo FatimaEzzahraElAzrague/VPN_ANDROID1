@@ -25,6 +25,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import com.example.v.R
 import com.example.v.components.ServerLocationCard
 import com.example.v.components.ConnectionDetailsPanel
@@ -32,9 +35,13 @@ import com.example.v.models.Server
 import com.example.v.ui.theme.VPNTheme
 import com.example.v.ui.theme.getGradientBackground
 import com.example.v.ui.theme.ThemeToggleButton
+import com.example.v.utils.IPChecker
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.runtime.collectAsState
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -48,15 +55,45 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    vpnManager: com.example.v.vpn.VPNManager? = null
+    vpnManager: com.example.v.vpn.VPNManager
 ) {
-    var isConnected by remember { mutableStateOf(connectedServer != null) }
+    // Debug logging for VPNManager
+    LaunchedEffect(vpnManager) {
+        println("🔍 DEBUG: HomeScreen - vpnManager received: $vpnManager")
+        println("🔍 DEBUG: HomeScreen - currentServer: $currentServer")
+        println("🔍 DEBUG: HomeScreen - vpnManager class: ${vpnManager.javaClass.simpleName}")
+    }
+    // State variables
+    var isConnected by remember { mutableStateOf(false) }
     var selectedServer by remember { mutableStateOf(currentServer) }
     var sessionStartTime by remember { mutableStateOf<Long?>(null) }
     var sessionDuration by remember { mutableStateOf("00:00:00") }
-    var showPermissionDialog by remember { mutableStateOf(false) }
+    var currentIP by remember { mutableStateOf<String?>(null) }
+    var originalIP by remember { mutableStateOf<String?>(null) }
+    
+    // Observe VPN connection state
+    val vpnConnectionState by remember(vpnManager) {
+        vpnManager.connectionState
+    }.collectAsState()
+    isConnected = vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTED
+    
+    // UI state
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+    
+    // Launcher for VPN permission dialog
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { _: ActivityResult ->
+        val granted = vpnManager.hasVpnPermission()
+        println("🔍 DEBUG: VPN permission result received. granted=$granted")
+        if (granted) {
+            println("🔍 DEBUG: Permission granted via dialog. Connecting now...")
+            vpnManager.connect(currentServer)
+        } else {
+            println("🔍 DEBUG: Permission denied by user.")
+        }
+    }
     
     // Update connection state when connectedServer changes
     LaunchedEffect(connectedServer) {
@@ -82,24 +119,84 @@ fun HomeScreen(
             sessionDuration = "00:00:00"
         }
     }
+    
+    // Check IP address changes
+    LaunchedEffect(Unit) {
+        // Get original IP when screen loads
+        launch {
+            val ip = IPChecker.getCurrentIP()
+            originalIP = ip
+            currentIP = ip
+            println("🔍 DEBUG: Original IP: $ip")
+        }
+    }
+    
+    LaunchedEffect(isConnected) {
+        if (isConnected) {
+            // Delay a bit for VPN to establish, then check IP
+            delay(3000)
+            launch {
+                val ip = IPChecker.getCurrentIP()
+                currentIP = ip
+                println("🔍 DEBUG: VPN IP: $ip (Original: $originalIP)")
+                
+                if (ip != null && originalIP != null && ip != originalIP) {
+                    println("✅ VPN IP VERIFICATION PASSED: $originalIP → $ip")
+                } else {
+                    println("❌ VPN IP VERIFICATION FAILED: IP unchanged ($ip)")
+                }
+            }
+        }
+    }
 
     // Handle VPN connection
     fun handleConnect() {
-        if (isConnected) {
+        println("🔍 DEBUG: handleConnect function called")
+        println("🔍 DEBUG: Current state: $vpnConnectionState")
+        
+        if (vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTED) {
             // Disconnect
+            println("🔍 DEBUG: Disconnecting VPN")
             onDisconnect()
+        } else if (vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTING) {
+            println("🔍 DEBUG: VPN is already connecting...")
+            return
         } else {
-            // Check VPN permission first
-            if (vpnManager?.hasVpnPermission() == true) {
+            // Debug logging
+            println("🔍 DEBUG: handleConnect called")
+            println("🔍 DEBUG: vpnManager = $vpnManager")
+            println("🔍 DEBUG: currentServer = $currentServer")
+            println("🔍 DEBUG: currentServer.id = ${currentServer.id}")
+            println("🔍 DEBUG: currentServer.city = ${currentServer.city}")
+            
+            println("🔍 DEBUG: ===============================")
+            println("🔍 DEBUG: CONNECT BUTTON CLICKED!")
+            println("🔍 DEBUG: ===============================")
+            
+            // Always check VPN permission first - even if we think we have it
+            val hasPermission = vpnManager.hasVpnPermission()
+            println("🔍 DEBUG: hasVpnPermission = $hasPermission")
+            
+            if (hasPermission) {
                 // Connect directly to current server
+                println("🔍 DEBUG: ✅ Has permission, connecting to ${currentServer.city}")
+                println("🔍 DEBUG: Calling vpnManager.connect() now...")
                 vpnManager.connect(currentServer)
+                println("🔍 DEBUG: vpnManager.connect() call completed")
             } else {
                 // Request VPN permission
-                val permissionIntent = vpnManager?.getVpnPermissionIntent()
+                println("🔍 DEBUG: ❌ No permission, requesting VPN permission")
+                val permissionIntent = vpnManager.getVpnPermissionIntent()
+                println("🔍 DEBUG: permissionIntent = $permissionIntent")
+                
                 if (permissionIntent != null) {
-                    context.startActivity(permissionIntent)
+                    println("🔍 DEBUG: Launching VPN permission dialog via Activity Result API...")
+                    vpnPermissionLauncher.launch(permissionIntent)
                 } else {
-                    showPermissionDialog = true
+                    println("🔍 DEBUG: ❌ permissionIntent is null - this should not happen!")
+                    // Try to connect anyway - permission might already be granted
+                    println("🔍 DEBUG: Attempting to connect anyway...")
+                    vpnManager.connect(currentServer)
                 }
             }
         }
@@ -141,25 +238,33 @@ fun HomeScreen(
                         .verticalScroll(scrollState),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                // Status Text
-                Text(
-                    text = if (isConnected) "CONNECTED" else "DISCONNECTED",
+                    // Status Text
+                    Text(
+                        text = if (isConnected) "CONNECTED" else "DISCONNECTED",
                         color = if (isConnected) Color(0xFF4CAF50) else if (isDarkTheme) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.2.sp
-                )
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 1.2.sp
+                    )
 
-                Spacer(modifier = Modifier.height(40.dp))
+                    Spacer(modifier = Modifier.height(40.dp))
 
-                // Central Connect Button
+                    // Central Connect Button
                     ConnectButton(
-                    isConnected = isConnected,
-                    onClick = { handleConnect() },
-                    modifier = Modifier.size(200.dp)
-                )
+                        isConnected = isConnected,
+                        isConnecting = vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTING,
+                        onClick = { 
+                            println("🔍 DEBUG: Connect button clicked!")
+                            println("🔍 DEBUG: Button state - isConnected: $isConnected")
+                            println("🔍 DEBUG: Button state - vpnConnectionState: $vpnConnectionState")
+                            println("🔍 DEBUG: About to call handleConnect()")
+                            handleConnect() 
+                            println("🔍 DEBUG: handleConnect() called successfully")
+                        },
+                        modifier = Modifier.size(200.dp)
+                    )
 
-                Spacer(modifier = Modifier.height(60.dp))
+                    Spacer(modifier = Modifier.height(60.dp))
 
                     // Server Selection Card (clickable)
                     ServerSelectionCard(
@@ -177,6 +282,7 @@ fun HomeScreen(
                         ConnectionDetailsCard(
                             server = connectedServer,
                             sessionDuration = sessionDuration,
+                            localTunnelIp = vpnManager.getLocalTunnelIpv4(),
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -184,33 +290,8 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(80.dp))
                 }
             }
-        }
-        
-        // VPN Permission Dialog
-        if (showPermissionDialog) {
-            AlertDialog(
-                onDismissRequest = { showPermissionDialog = false },
-                title = { Text("VPN Permission Required") },
-                text = { Text("This app needs VPN permission to establish secure connections. Please grant the permission in the next dialog.") },
-                confirmButton = {
-                    TextButton(
-                        onClick = {
-                            showPermissionDialog = false
-                            val permissionIntent = vpnManager?.getVpnPermissionIntent()
-                            if (permissionIntent != null) {
-                                context.startActivity(permissionIntent)
-                            }
-                        }
-                    ) {
-                        Text("Grant Permission")
-                    }
-                },
-                dismissButton = {
-                    TextButton(onClick = { showPermissionDialog = false }) {
-                        Text("Cancel")
-                    }
-                }
-            )
+            
+
         }
     }
 }
@@ -218,6 +299,7 @@ fun HomeScreen(
 @Composable
 private fun ConnectButton(
     isConnected: Boolean,
+    isConnecting: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -232,7 +314,11 @@ private fun ConnectButton(
         label = "buttonScale"
     )
 
-    val buttonColor = if (isConnected) Color(0xFF4CAF50) else Color(0xFFFF6C36)
+    val buttonColor = when {
+        isConnected -> Color(0xFF4CAF50)
+        isConnecting -> Color(0xFFFFA726)
+        else -> Color(0xFFFF6C36)
+    }
     val shadowColor = buttonColor.copy(alpha = 0.3f)
 
     Box(
@@ -246,7 +332,7 @@ private fun ConnectButton(
             )
             .clip(CircleShape)
             .background(buttonColor)
-            .clickable {
+            .clickable(enabled = !isConnecting) {
                 isPressed = true
                 onClick()
             }
@@ -260,7 +346,11 @@ private fun ConnectButton(
             // Use the power_ic vector asset
             Icon(
                 painter = painterResource(id = R.drawable.power_ic),
-                contentDescription = if (isConnected) "Disconnect" else "Connect",
+                contentDescription = when {
+                    isConnected -> "Disconnect"
+                    isConnecting -> "Connecting"
+                    else -> "Connect"
+                },
                 tint = Color.White,
                 modifier = Modifier.size(48.dp)
             )
@@ -268,7 +358,11 @@ private fun ConnectButton(
             Spacer(modifier = Modifier.height(8.dp))
 
             Text(
-                text = if (isConnected) "DISCONNECT" else "CONNECT",
+                text = when {
+                    isConnected -> "DISCONNECT"
+                    isConnecting -> "CONNECTING..."
+                    else -> "CONNECT"
+                },
                 color = Color.White,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
@@ -368,6 +462,7 @@ private fun ServerSelectionCard(
 private fun ConnectionDetailsCard(
     server: Server,
     sessionDuration: String,
+    localTunnelIp: String?,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -430,14 +525,16 @@ private fun ConnectionDetailsCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    val ipText = localTunnelIp ?: "---"
                     Text(
-                        text = "192.168.1.103",
+                        text = ipText,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.width(8.dp))
+                    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
                     TextButton(
-                        onClick = { /* TODO: Copy IP */ },
+                        onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(ipText)) },
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
                         colors = ButtonDefaults.textButtonColors(
                             contentColor = Color(0xFFFF6C36)
@@ -453,42 +550,44 @@ private fun ConnectionDetailsCard(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-                    // Server IP
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
+            // Server IP
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Server IP Address",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                )
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val endpoint = server.wireGuardConfig?.serverEndpoint ?: "---"
+                    Text(
+                        text = endpoint,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                    TextButton(
+                        onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(endpoint)) },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                        colors = ButtonDefaults.textButtonColors(
+                            contentColor = Color(0xFFFF6C36)
+                        )
                     ) {
                         Text(
-                            text = "Server IP Address",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+                            text = "Copy",
+                            style = MaterialTheme.typography.bodySmall
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = server.wireGuardConfig?.serverEndpoint ?: "---",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            TextButton(
-                                onClick = { /* TODO: Copy IP */ },
-                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = Color(0xFFFF6C36)
-                                )
-                            ) {
-                                Text(
-                                    text = "Copy",
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            }
-                        }
                     }
+                }
+            }
 
-        Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Session Duration
             Row(
@@ -501,7 +600,7 @@ private fun ConnectionDetailsCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
-        Text(
+                Text(
                     text = sessionDuration,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface

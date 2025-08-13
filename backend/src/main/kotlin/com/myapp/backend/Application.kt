@@ -4,6 +4,7 @@ import com.myapp.backend.config.Env
 import com.myapp.backend.config.jwtConfig
 import com.myapp.backend.db.DatabaseFactory
 import com.myapp.backend.routes.authRoutes
+import com.myapp.backend.routes.autoConnectRoutes
 import com.myapp.backend.routes.profileRoutes
 import com.myapp.backend.routes.killSwitchRoutes
 import com.myapp.backend.routes.vpnFeaturesRoutes
@@ -56,6 +57,7 @@ fun Application.module() {
         profileRoutes()
         killSwitchRoutes()
         vpnFeaturesRoutes()
+        autoConnectRoutes()
     }
 }
 

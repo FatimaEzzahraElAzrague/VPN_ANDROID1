@@ -3,14 +3,19 @@ package com.example.v
 
 import android.app.Activity
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.v.navigation.AuthNavigation
+import com.example.v.autoconnect.AutoConnectManager
+import com.example.v.data.autoconnect.AutoConnectRepository
+import com.example.v.vpn.VPNManager
 import com.example.v.navigation.VPNNavigation
 import com.example.v.services.GoogleSignInService
 import com.example.v.ui.theme.VPNTheme
@@ -32,6 +37,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         googleSignInService = GoogleSignInService(this)
@@ -50,6 +56,22 @@ class MainActivity : ComponentActivity() {
                 }
             )
         }
+
+        // Start Auto-Connect monitoring once app launches
+        val repo = AutoConnectRepository(applicationContext)
+        val vpnManager = VPNManager.getInstance(applicationContext)
+        val autoConnectManager = AutoConnectManager(
+            context = applicationContext,
+            repo = repo,
+            startVpnTunnel = {
+                // Use optimal server when auto-connecting
+                val optimal = com.example.v.data.ServersData.getOptimalServer()
+                if (optimal != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    vpnManager.connect(optimal)
+                }
+            }
+        )
+        autoConnectManager.start()
     }
 
     private fun handleGoogleSignInResult(data: Intent?) {
@@ -72,6 +94,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun VPNApp(
     onGoogleSignInRequest: () -> Unit = {},
@@ -111,6 +134,7 @@ fun VPNApp(
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Preview(showBackground = true)
 @Composable
 fun DefaultPreview() {

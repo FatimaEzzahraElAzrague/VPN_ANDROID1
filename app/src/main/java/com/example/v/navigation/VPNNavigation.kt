@@ -1,5 +1,7 @@
 package com.example.v.navigation
 
+import android.os.Build
+import androidx.annotation.RequiresApi
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -11,7 +13,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.collectAsState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.StateFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
@@ -29,6 +33,7 @@ import com.example.v.vpn.VPNManager
 import com.example.v.vpn.VPNConnectionState
 import com.example.v.ui.theme.*
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
 fun VPNNavigation(
     isDarkTheme: Boolean,
@@ -44,11 +49,15 @@ fun VPNNavigation(
     
     // Get VPN Manager instance
     val context = LocalContext.current
-    val vpnManager = remember { VPNManager.getInstance(context) }
+    val vpnManager = remember { 
+        val manager = VPNManager.getInstance(context)
+        println("🔍 DEBUG: VPNNavigation - VPNManager instance: $manager")
+        manager
+    }
     
     // Observe VPN connection state
-    val connectionState by vpnManager.connectionState.observeAsState(initial = VPNConnectionState.DISCONNECTED)
-    val currentServer by vpnManager.currentServer.observeAsState(initial = null)
+    val connectionState by vpnManager.connectionState.collectAsState()
+    val currentServer by vpnManager.currentServer.collectAsState()
     
     // Update connected server based on VPN manager state
     LaunchedEffect(connectionState, currentServer) {
@@ -143,22 +152,25 @@ fun VPNNavigation(
                  modifier = Modifier.padding(paddingValues)
              ) {
                  when (selectedTab) {
-                                      0 -> HomeScreen(
-                     currentServer = selectedServer ?: VPNConfig.defaultServer,
-                     connectedServer = connectedServer,
-                     onServerChange = { showServersScreen = true },
-                     onNavigate = { route ->
-                         when (route) {
-                             "servers" -> showServersScreen = true
-                         }
-                     },
-                     onDisconnect = { 
-                         vpnManager.disconnect()
-                     },
-                     isDarkTheme = isDarkTheme,
-                     onThemeToggle = onThemeToggle,
-                     vpnManager = vpnManager
-                 )
+                                                      0 -> HomeScreen(
+                    currentServer = selectedServer ?: VPNConfig.defaultServer,
+                    connectedServer = connectedServer,
+                    onServerChange = { showServersScreen = true },
+                    onNavigate = { route ->
+                        when (route) {
+                            "servers" -> showServersScreen = true
+                        }
+                    },
+                    onDisconnect = { 
+                        println("🔍 DEBUG: Disconnect called from HomeScreen")
+                        vpnManager.disconnect()
+                    },
+                    isDarkTheme = isDarkTheme,
+                    onThemeToggle = onThemeToggle,
+                    vpnManager = vpnManager.also { 
+                        println("🔍 DEBUG: Passing VPNManager to HomeScreen: $it")
+                    }
+                )
                      1 -> AIAnalyzerScreen(
                          isDarkTheme = isDarkTheme,
                          onThemeToggle = onThemeToggle

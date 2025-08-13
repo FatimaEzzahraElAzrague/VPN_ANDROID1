@@ -41,6 +41,33 @@ class VPNFeaturesApiClient {
             })
         }
     }
+
+    // Auto-Connect API
+    suspend fun getAutoConnectSettings(token: String): Result<AutoConnectSettingsResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = client.get("$BASE_URL/settings/auto-connect") {
+                    header("Authorization", "Bearer $token")
+                }
+                Result.success(response.body())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
+
+    suspend fun saveAutoConnectSettings(token: String, enabled: Boolean, mode: String): Result<AutoConnectSettingsResponse> =
+        withContext(Dispatchers.IO) {
+            try {
+                val response = client.post("$BASE_URL/settings/auto-connect") {
+                    header("Authorization", "Bearer $token")
+                    contentType(ContentType.Application.Json)
+                    setBody(mapOf("enabled" to enabled, "mode" to mode))
+                }
+                Result.success(response.body())
+            } catch (e: Exception) {
+                Result.failure(e)
+            }
+        }
     
     // Speed Test API Methods
     suspend fun getSpeedTestServers(): Result<List<SpeedTestServer>> = withContext(Dispatchers.IO) {
@@ -267,4 +294,11 @@ data class KillSwitchConfig(
     val connectionTimeoutMs: Long,
     val notifyOnKillSwitch: Boolean,
     val blockAllTraffic: Boolean
+)
+
+// Auto-Connect response DTO
+@kotlinx.serialization.Serializable
+data class AutoConnectSettingsResponse(
+    val enabled: Boolean,
+    val mode: String
 )

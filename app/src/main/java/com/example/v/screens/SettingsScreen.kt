@@ -773,9 +773,22 @@ private fun AutoConnectPage(
     onBack: () -> Unit,
     onThemeToggle: () -> Unit
 ) {
-    var autoConnectEnabled by remember { mutableStateOf(true) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val repo = remember { com.example.v.data.autoconnect.AutoConnectRepository(context) }
+    val scope = rememberCoroutineScope()
+    var autoConnectEnabled by remember { mutableStateOf(false) }
+    var mode by remember { mutableStateOf(com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI_OR_CELLULAR) }
     var trustedNetworksPermission by remember { mutableStateOf(false) }
-    var selectedOption by remember { mutableStateOf("Always") }
+
+    LaunchedEffect(Unit) {
+        val current = repo.get()
+        if (current != null) {
+            autoConnectEnabled = current.enabled
+            mode = current.mode
+        } else {
+            repo.set(false, com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI_OR_CELLULAR)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -855,7 +868,10 @@ private fun AutoConnectPage(
                                 }
                                 Switch(
                                     checked = autoConnectEnabled,
-                                    onCheckedChange = { autoConnectEnabled = it },
+                                    onCheckedChange = { enabled ->
+                                        autoConnectEnabled = enabled
+                                        scope.launch { repo.set(autoConnectEnabled, mode) }
+                                    },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color(0xFFFF6B35),
                                         checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
@@ -883,17 +899,22 @@ private fun AutoConnectPage(
                                 Spacer(modifier = Modifier.height(16.dp))
 
                                 // Connection options
-                                val options = listOf("Always", "On untrusted networks", "Never")
-                                options.forEach { option ->
+                                val options = listOf(
+                                    com.example.v.data.autoconnect.AutoConnectMode.UNSECURED_WIFI_ONLY to "Unsecured Wi‑Fi only",
+                                    com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI to "Any Wi‑Fi",
+                                    com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI_OR_CELLULAR to "Any Wi‑Fi or cellular"
+                                )
+                                options.forEach { (value, label) ->
                                     RadioOption(
-                                        text = option,
-                                        selected = selectedOption == option,
-                                        onSelect = { selectedOption = option },
+                                        text = label,
+                                        selected = mode == value,
+                                        onSelect = {
+                                            mode = value
+                                            scope.launch { repo.set(autoConnectEnabled, mode) }
+                                        },
                                         isDarkTheme = isDarkTheme
                                     )
-                                    if (option != options.last()) {
-                                        Spacer(modifier = Modifier.height(8.dp))
-                                    }
+                                    Spacer(modifier = Modifier.height(8.dp))
                                 }
                             }
                         }
@@ -925,9 +946,7 @@ private fun AutoConnectPage(
                                     description = "Auto Connect won't connect to your VPN when this device is on a trusted network",
                                     icon = Icons.Default.Shield,
                                     onClick = {
-                                        if (!trustedNetworksPermission) {
-                                            trustedNetworksPermission = true
-                                        }
+                                        trustedNetworksPermission = true
                                     },
                                     isDarkTheme = isDarkTheme
                                 )
@@ -946,7 +965,8 @@ private fun KillSwitchPage(
     onBack: () -> Unit,
     onThemeToggle: () -> Unit
 ) {
-    var killSwitchEnabled by remember { mutableStateOf(false) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var killSwitchEnabled by remember { mutableStateOf(com.example.v.data.killswitch.KillSwitchPrefs.isEnabled(context)) }
 
     Box(
         modifier = Modifier
@@ -1031,7 +1051,10 @@ private fun KillSwitchPage(
                                 }
                                 Switch(
                                     checked = killSwitchEnabled,
-                                    onCheckedChange = { killSwitchEnabled = it },
+                                    onCheckedChange = {
+                                        killSwitchEnabled = it
+                                        com.example.v.data.killswitch.KillSwitchPrefs.setEnabled(context, it)
+                                    },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color(0xFFFF6B35),
                                         checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
