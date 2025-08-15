@@ -45,14 +45,19 @@ class RealWireGuardBackend(private val context: Context) {
         val b = backend ?: return false
         val tState = when (state) { TunnelState.UP -> Tunnel.State.UP; TunnelState.DOWN -> Tunnel.State.DOWN }
         return try {
+            Log.d(TAG, "🔍 DEBUG: Building WireGuard config for ${server.name}")
             val cfg = buildConfig(server, client)
+            Log.d(TAG, "🔍 DEBUG: Config built successfully, creating tunnel...")
             createTunnelIfNeeded(server.name)
             val t = tunnel!!
-            runBlocking { b.setState(t, tState, cfg) }
+            Log.d(TAG, "🔍 DEBUG: Setting tunnel state to $tState...")
+            val result = runBlocking { b.setState(t, tState, cfg) }
+            Log.d(TAG, "🔍 DEBUG: GoBackend setState result: $result")
             Log.d(TAG, "Tunnel state set to $tState")
             true
         } catch (e: Exception) {
-            Log.e(TAG, "Error setting tunnel state: ${e.message}", e)
+            Log.e(TAG, "❌ Error setting tunnel state: ${e.message}", e)
+            Log.e(TAG, "❌ Stack trace: ${e.stackTraceToString()}")
             false
         }
     }
@@ -74,20 +79,15 @@ class RealWireGuardBackend(private val context: Context) {
 
     private fun buildConfig(server: Server, client: ClientConfig): Config {
         val wg = server.wireGuardConfig
-        // Force IPv4-only for reliability on mobile networks (IPv6 routing/NAT often missing on servers)
-        // If you later need IPv6, we can make this dynamic again.
-        val ipv4Only = true
+        // Allow both IPv4 and IPv6 for proper server compatibility
+        val ipv4Only = false
         
         // Define variables outside the StringBuilder scope for logging
         val dns = (wg?.dns?.takeIf { it.isNotBlank() } ?: client.dns)
         val mtu = wg?.mtu ?: 1280
         val defaultAllowed = if (ipv4Only) "0.0.0.0/0" else "0.0.0.0/0, ::/0"
-        // If IPv4-only is enabled, force IPv4 route regardless of server-provided value
-        val allowed = if (ipv4Only) {
-            "0.0.0.0/0"
-        } else {
-            (wg?.allowedIPs?.takeIf { it.isNotBlank() } ?: defaultAllowed)
-        }
+        // Use server-provided AllowedIPs or default to both IPv4 and IPv6
+        val allowed = (wg?.allowedIPs?.takeIf { it.isNotBlank() } ?: defaultAllowed)
         val ka = if (wg?.keepAlive != null && wg.keepAlive > 0) wg.keepAlive else 25
         
         val sb = StringBuilder().apply {
