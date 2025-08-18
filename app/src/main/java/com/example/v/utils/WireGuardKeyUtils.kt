@@ -129,7 +129,8 @@ object WireGuardKeyUtils {
         
         val adjective = adjectives.random()
         val noun = nouns.random()
-        val number = (100..999).random()
+        val random = java.util.Random()
+        val number = random.nextInt(100, 1000)
         
         return "$adjective-$noun-$number"
     }

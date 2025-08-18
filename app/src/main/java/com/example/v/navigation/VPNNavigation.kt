@@ -195,7 +195,7 @@ private fun ServerItem(
 ) {
     val primaryTextColor = if (isDarkTheme) Color(0xFFFFFFFF) else Color(0xFF4A5161)
     val secondaryTextColor = Color(0xFF979EAE)
-    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1F2838) else Color(0xFFFFFFFF)
+    val cardBackgroundColor = if (isDarkTheme) Color(0xFF1A1F2E) else Color(0xFFFFFFFF)
     val orangeColor = Color(0xFFFF6C36)
 
     val animatedScale by animateFloatAsState(

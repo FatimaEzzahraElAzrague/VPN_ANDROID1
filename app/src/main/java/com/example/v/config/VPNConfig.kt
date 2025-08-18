@@ -11,11 +11,21 @@ import com.example.v.models.ClientConfig
 object VPNConfig {
     
     /**
+     * VPN API Configuration
+     * Centralized VPN management system configuration
+     */
+    object VPNApiConfig {
+        // VPN API server running on your desktop (same as desktop version)
+        const val BASE_URL = "http://192.168.100.58:8000" // Your desktop IP
+        const val AGENT_TOKEN = "vpn-agent-secret-token-2024" // Same as desktop version
+    }
+    
+    /**
      * EC2 Paris Server Configuration
      * Real WireGuard configuration for Paris server
      */
     val parisServer = Server(
-        id = "france-paris",
+        id = "paris", // Changed to match API location format
         name = "Europe (Paris)",
         country = "France",
         countryCode = "FR",
@@ -29,8 +39,8 @@ object VPNConfig {
         latitude = 48.8566,
         longitude = 2.3522,
         wireGuardConfig = WireGuardConfig(
-            serverPublicKey = "MlQThMgSYAAT2cpNpeKj2Y4eZoC90NSK8Y5xzIF1IlE=",
-            serverEndpoint = "13.38.83.180",
+            serverPublicKey = "yvB7acu9ncFFEyzw5n8L7kpLazTgQonML1PuhoStjjg=", // Matches desktop API
+            serverEndpoint = "52.47.190.220", // Paris server IP from desktop API
             serverPort = 51820,
             allowedIPs = "0.0.0.0/0,::/0",
             dns = "1.1.1.1,8.8.8.8",
@@ -54,10 +64,10 @@ object VPNConfig {
      * Real client configuration from WireGuard
      */
     val osakaClientConfig = ClientConfig(
-        privateKey = "kMphb0Ww8aGc1kxHfbt2FL+q6YkPOvoP9xOxJuK3dFQ=",
+        privateKey = "4AS5cvcLvdzso8wbzgBrxUx223PVkHVe8UYphvVQGEI=",
         publicKey = "", // Not used by current implementation
-        address = "10.66.66.2/32,fd42:42:42::2/128",
-        dns = "1.1.1.1,1.1.1.1"
+        address = "10.77.27.2/32,fd42:42:21::2/128",
+        dns = "1.1.1.1,8.8.8.8"
     )
     
     /**
@@ -67,7 +77,7 @@ object VPNConfig {
         parisServer,
         // Add Osaka server
         Server(
-            id = "asia-pacific-osaka",
+            id = "osaka", // Changed to match API location format
             name = "Asia Pacific (Osaka)",
             country = "Japan",
             countryCode = "JP",
@@ -81,12 +91,12 @@ object VPNConfig {
             latitude = 34.6937,
             longitude = 135.5023,
             wireGuardConfig = WireGuardConfig(
-                serverPublicKey = "hvyFo271WqTOpw6sS0dgMfnRde2J0DKlkMSCl/3PFUo=",
-                serverEndpoint = "56.155.92.31",
+                serverPublicKey = "Hr1B3sNsDSxFpR+zO34qLGxutUK3wgaPwrsWoY2ViAM=", // Matches desktop API
+                serverEndpoint = "15.168.240.118", // Osaka server IP from desktop API
                 serverPort = 51820,
                 allowedIPs = "0.0.0.0/0,::/0",
-                dns = "1.1.1.1,1.1.1.1",
-                presharedKey = "OkW8zpjy57QcniepR66O0+awsoN+7/C3WVWnQxxhAK4="
+                dns = "1.1.1.1,8.8.8.8",
+                presharedKey = "BOJ/gcaaEa/o0RXY/gyUXBjcn2Wi5QtaNgS4L4gPd+o="
             )
         )
     )

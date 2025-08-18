@@ -16,4 +16,13 @@ data class AutoConnectSettingsEntity(
     val mode: AutoConnectMode
 )
 
+@Entity(tableName = "trusted_networks")
+data class TrustedNetworkEntity(
+    @PrimaryKey val id: Int,
+    val ssid: String,
+    val name: String,
+    val isTrusted: Boolean = true,
+    val addedAt: Long = System.currentTimeMillis()
+)
+
 

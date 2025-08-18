@@ -1,6 +1,7 @@
 package com.example.v.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -48,7 +49,7 @@ fun ConnectionDetailsPanel(
                 ambientColor = Color.Black.copy(alpha = 0.2f)
             ),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF1A1A1A) else MaterialTheme.colorScheme.surface.copy(alpha = 0.9f)
         )
     ) {
         Column(

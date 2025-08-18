@@ -1,9 +1,11 @@
 package com.example.v.screens
 
+import android.util.Log
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -12,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.runtime.*
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
@@ -41,12 +44,22 @@ import com.example.v.components.AppIcon
 import com.example.v.models.InstalledApp
 import com.example.v.utils.AppUtils
 import androidx.compose.ui.platform.LocalContext
-import com.example.v.utils.RealTimeSpeedTest
+import com.example.v.config.VPNConfig
+import com.example.v.utils.FastAPISpeedTestService
 import com.example.v.utils.RealTimeSpeedTestResult
 import com.example.v.utils.TestPhase
-
-// Import theme colors
 import com.example.v.ui.theme.*
+import com.example.v.vpn.VPNManager
+
+// Extension function to convert RealTimeSpeedTestResult to SpeedTestResults
+private fun RealTimeSpeedTestResult.toSpeedTestResults(): SpeedTestResults {
+    return SpeedTestResults(
+        downloadSpeed = this.downloadMbps.toFloat(),
+        uploadSpeed = this.uploadMbps.toFloat(),
+        ping = this.pingMs.toInt(),
+        jitter = 0 // Jitter not measured in current implementation
+    )
+}
 
 // Define SpeedTestResults data class
 data class SpeedTestResults(
@@ -60,7 +73,7 @@ private fun getSecondaryTextColor(): Color = Color.Gray
 private fun getPrimaryTextColor(isDarkTheme: Boolean): Color =
     if (isDarkTheme) Color.White else Color.Black
 private fun getCardBackgroundColor(isDarkTheme: Boolean): Color =
-    if (isDarkTheme) Color(0xFF2D2D2D) else Color.White
+    if (isDarkTheme) Color(0xFF0D1B2A) else Color.White
 
 // Define missing composable functions
 @Composable
@@ -121,13 +134,14 @@ private fun PrimaryButton(
 @Composable
 private fun StyledCard(
     modifier: Modifier = Modifier,
+    isDarkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit
 ) {
     Card(
         modifier = modifier,
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = Color.White.copy(alpha = 0.9f)
+            containerColor = if (isDarkTheme) Color(0xFF0D1B2A) else Color.White.copy(alpha = 0.9f)
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
         content = { content() }
@@ -434,7 +448,24 @@ private fun SpeedTestPage(
     var isRunning by remember { mutableStateOf(false) }
     var results by remember { mutableStateOf<SpeedTestResults?>(null) }
     var realTimeResults by remember { mutableStateOf(SpeedTestResults(0f, 0f, 0, 0)) }
+    var selectedServer by remember { mutableStateOf<FastAPISpeedTestService.SpeedTestServer?>(null) }
+    var availableServers by remember { mutableStateOf<List<FastAPISpeedTestService.SpeedTestServer>>(emptyList()) }
+    var serverConnectivity by remember { mutableStateOf<Map<String, Boolean>>(emptyMap()) }
     val coroutineScope = rememberCoroutineScope()
+
+    // Initialize servers on first load
+    LaunchedEffect(Unit) {
+        availableServers = FastAPISpeedTestService.getSpeedTestServers()
+        // Test connectivity to all servers
+        val connectivity = mutableMapOf<String, Boolean>()
+        for (server in availableServers) {
+            connectivity[server.name] = FastAPISpeedTestService.testServerConnectivity(server)
+        }
+        serverConnectivity = connectivity
+        
+        // Auto-select best server
+        selectedServer = FastAPISpeedTestService.getBestServer()
+    }
 
     Box(
         modifier = Modifier
@@ -443,7 +474,7 @@ private fun SpeedTestPage(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
+                .fillMaxWidth()
                 .padding(horizontal = 24.dp)
         ) {
             // Header
@@ -533,105 +564,107 @@ private fun SpeedTestPage(
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp)
                     ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Connection Analysis",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = getPrimaryTextColor(isDarkTheme),
-                                    fontWeight = FontWeight.Bold
-                                )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Connection Analysis",
+                                style = MaterialTheme.typography.titleMedium,
+                                color = getPrimaryTextColor(isDarkTheme),
+                                fontWeight = FontWeight.Bold
+                            )
 
-                                val connectionQuality = when {
-                                    results!!.downloadSpeed > 100f -> "Excellent"
-                                    results!!.downloadSpeed > 50f -> "Good"
-                                    results!!.downloadSpeed > 25f -> "Fair"
-                                    else -> "Poor"
-                                }
+                            val connectionQuality = when {
+                                results!!.downloadSpeed > 100f -> "Excellent"
+                                results!!.downloadSpeed > 50f -> "Good"
+                                results!!.downloadSpeed > 25f -> "Fair"
+                                else -> "Poor"
+                            }
 
-                                val qualityColor = when (connectionQuality) {
-                                    "Excellent" -> Color(0xFF4CAF50)
-                                    "Good" -> Color(0xFF8BC34A)
-                                    "Fair" -> Color(0xFFFF9800)
-                                    else -> Color(0xFFF44336)
-                                }
+                            val qualityColor = when (connectionQuality) {
+                                "Excellent" -> Color(0xFF4CAF50)
+                                "Good" -> Color(0xFF8BC34A)
+                                "Fair" -> Color(0xFFFF9800)
+                                else -> Color(0xFFF44336)
+                            }
 
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            color = qualityColor.copy(alpha = 0.1f),
-                                            shape = RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text(
-                                        text = connectionQuality,
-                                        color = qualityColor,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 12.sp
+                            Box(
+                                modifier = Modifier
+                                    .background(
+                                        color = qualityColor.copy(alpha = 0.1f),
+                                        shape = RoundedCornerShape(8.dp)
                                     )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Server location info with car dashboard styling
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.LocationOn,
-                                    contentDescription = "Server",
-                                    tint = Color(0xFFFF6B35),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Test Server: New York, USA",
-                                    color = getSecondaryTextColor(),
-                                    style = MaterialTheme.typography.bodyMedium
+                                    text = connectionQuality,
+                                    color = qualityColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 12.sp
                                 )
                             }
+                        }
 
-                            Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.AccessTime,
-                                    contentDescription = "Time",
-                                    tint = Color(0xFFFF6B35),
-                                    modifier = Modifier.size(20.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "Test completed at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}",
-                                    color = getSecondaryTextColor(),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
+                        // Server location info with car dashboard styling
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LocationOn,
+                                contentDescription = "Server",
+                                tint = Color(0xFFFF6B35),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                                                         Text(
+                                 text = "Test Server: ${selectedServer?.location ?: "Unknown"}",
+                                 color = getSecondaryTextColor(),
+                                 style = MaterialTheme.typography.bodyMedium
+                             )
+                        }
 
-                            Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(8.dp))
 
-                            // Run another test button with automotive styling
-                            PrimaryButton(
-                                onClick = {
-                                    isRunning = true
-                                    results = null
-                                    realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
-                                    
-                                    coroutineScope.launch {
-                                        try {
-                                            val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.AccessTime,
+                                contentDescription = "Time",
+                                tint = Color(0xFFFF6B35),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Test completed at ${java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault()).format(java.util.Date())}",
+                                color = getSecondaryTextColor(),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // Run another test button with automotive styling
+                        PrimaryButton(
+                            onClick = {
+                                isRunning = true
+                                results = null
+                                realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                
+                                                                 coroutineScope.launch {
+                                     try {
+                                         // Use best available server
+                                         val testServer = FastAPISpeedTestService.getBestServer()
+                                        if (testServer != null) {
                                             var finalResult: SpeedTestResults? = null
                                             
-                                            RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
+                                            FastAPISpeedTestService.runSpeedTest(testServer).collect { result ->
                                                 realTimeResults = result.toSpeedTestResults()
                                                 
                                                 if (result.testPhase == TestPhase.COMPLETED) {
@@ -640,25 +673,35 @@ private fun SpeedTestPage(
                                             }
                                             
                                             results = finalResult ?: realTimeResults
-                                            isRunning = false
-                                        } catch (e: Exception) {
-                                            // Fallback to simulated results if real test fails
+                                        } else {
+                                            // Fallback to simulated results if no server available
+                                            val random = java.util.Random()
                                             results = SpeedTestResults(
-                                                downloadSpeed = (80..150).random().toFloat(),
-                                                uploadSpeed = (20..50).random().toFloat(),
-                                                ping = (10..50).random(),
-                                                jitter = (1..10).random()
+                                                downloadSpeed = random.nextInt(80, 151).toFloat(),
+                                                uploadSpeed = random.nextInt(20, 51).toFloat(),
+                                                ping = random.nextInt(10, 51),
+                                                jitter = random.nextInt(1, 11)
                                             )
-                                            isRunning = false
                                         }
+                                        isRunning = false
+                                    } catch (e: Exception) {
+                                        // Fallback to simulated results if real test fails
+                                        val random = java.util.Random()
+                                        results = SpeedTestResults(
+                                            downloadSpeed = random.nextInt(80, 151).toFloat(),
+                                            uploadSpeed = random.nextInt(20, 51).toFloat(),
+                                            ping = random.nextInt(10, 51),
+                                            jitter = random.nextInt(1, 11)
+                                        )
+                                        isRunning = false
                                     }
-                                },
-                                text = "Run Another Test",
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
+                                }
+                            },
+                            text = "Run Another Test",
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
-                else {
+                } else {
                     // Initial state - no test run yet with automotive styling
                     Column(
                         modifier = Modifier.fillMaxWidth(),
@@ -722,43 +765,56 @@ private fun SpeedTestPage(
 
                         Spacer(modifier = Modifier.height(40.dp))
 
-                                                    PrimaryButton(
-                                onClick = {
-                                    isRunning = true
-                                    realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
-                                    
-                                    coroutineScope.launch {
-                                        try {
-                                            val testServer = RealTimeSpeedTest.getOptimizedTestServers().first()
-                                            var finalResult: SpeedTestResults? = null
-                                            
-                                            RealTimeSpeedTest.runRealTimeSpeedTest(testServer).collect { result ->
-                                                realTimeResults = result.toSpeedTestResults()
-                                                
-                                                if (result.testPhase == TestPhase.COMPLETED) {
-                                                    finalResult = result.toSpeedTestResults()
-                                                }
-                                            }
-                                            
-                                            results = finalResult ?: realTimeResults
-                                            isRunning = false
-                                        } catch (e: Exception) {
-                                            // Fallback to simulated results if real test fails
-                                            results = SpeedTestResults(
-                                                downloadSpeed = (80..150).random().toFloat(),
-                                                uploadSpeed = (20..50).random().toFloat(),
-                                                ping = (10..50).random(),
-                                                jitter = (1..10).random()
-                                            )
-                                            isRunning = false
-                                        }
-                                    }
-                                },
-                            text = "Start Speed Test",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 48.dp)
-                        )
+                                                 PrimaryButton(
+                             onClick = {
+                                 isRunning = true
+                                 realTimeResults = SpeedTestResults(0f, 0f, 0, 0)
+                                 
+                                 coroutineScope.launch {
+                                     try {
+                                         // Use best available server
+                                         val testServer = FastAPISpeedTestService.getBestServer()
+                                         if (testServer != null) {
+                                             var finalResult: SpeedTestResults? = null
+                                             
+                                             FastAPISpeedTestService.runSpeedTest(testServer).collect { result ->
+                                                 realTimeResults = result.toSpeedTestResults()
+                                                 
+                                                 if (result.testPhase == TestPhase.COMPLETED) {
+                                                     finalResult = result.toSpeedTestResults()
+                                                 }
+                                             }
+                                             
+                                             results = finalResult ?: realTimeResults
+                                         } else {
+                                             // Fallback to simulated results if no server available
+                                             val random = java.util.Random()
+                                             results = SpeedTestResults(
+                                                 downloadSpeed = random.nextInt(80, 151).toFloat(),
+                                                 uploadSpeed = random.nextInt(20, 51).toFloat(),
+                                                 ping = random.nextInt(10, 51),
+                                                 jitter = random.nextInt(1, 11)
+                                             )
+                                         }
+                                         isRunning = false
+                                     } catch (e: Exception) {
+                                         // Fallback to simulated results if real test fails
+                                         val random = java.util.Random()
+                                         results = SpeedTestResults(
+                                             downloadSpeed = random.nextInt(80, 151).toFloat(),
+                                             uploadSpeed = random.nextInt(20, 51).toFloat(),
+                                             ping = random.nextInt(10, 51),
+                                             jitter = random.nextInt(1, 11)
+                                         )
+                                         isRunning = false
+                                     }
+                                 }
+                             },
+                             text = "Start Speed Test",
+                             modifier = Modifier
+                                 .fillMaxWidth()
+                                 .padding(horizontal = 48.dp)
+                         )
                     }
                 }
             }
@@ -778,8 +834,74 @@ private fun AutoConnectPage(
     val scope = rememberCoroutineScope()
     var autoConnectEnabled by remember { mutableStateOf(false) }
     var mode by remember { mutableStateOf(com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI_OR_CELLULAR) }
-    var trustedNetworksPermission by remember { mutableStateOf(false) }
+    var currentNetworkSSID by remember { mutableStateOf<String?>(null) }
+    var currentNetworkSecurity by remember { mutableStateOf(com.example.v.utils.NetworkSecurityLevel.UNKNOWN) }
+    var isNetworkConnected by remember { mutableStateOf(false) }
+    var lastRefreshTime by remember { mutableStateOf(System.currentTimeMillis()) }
 
+    // Function to refresh network info
+    val refreshNetworkInfo = {
+        scope.launch {
+            currentNetworkSSID = com.example.v.utils.NetworkUtils.getCurrentNetworkSSID(context)
+            currentNetworkSecurity = com.example.v.utils.NetworkUtils.getNetworkSecurityLevel(context)
+            lastRefreshTime = System.currentTimeMillis()
+        }
+    }
+
+    // Network monitoring effect with proper cleanup
+    DisposableEffect(Unit) {
+        val connectivityManager = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+        
+        val networkCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+            override fun onAvailable(network: android.net.Network) {
+                isNetworkConnected = true
+                // Update network info when network becomes available
+                refreshNetworkInfo()
+            }
+            
+            override fun onLost(network: android.net.Network) {
+                isNetworkConnected = false
+                currentNetworkSSID = null
+                currentNetworkSecurity = com.example.v.utils.NetworkSecurityLevel.UNKNOWN
+                lastRefreshTime = System.currentTimeMillis()
+            }
+            
+            override fun onCapabilitiesChanged(network: android.net.Network, networkCapabilities: android.net.NetworkCapabilities) {
+                // Update when network capabilities change (e.g., WiFi security changes)
+                refreshNetworkInfo()
+            }
+        }
+        
+        // Register network callback
+        connectivityManager.registerDefaultNetworkCallback(networkCallback)
+        
+        // Initial network state
+        val activeNetwork = connectivityManager.activeNetwork
+        if (activeNetwork != null) {
+            val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
+            isNetworkConnected = capabilities != null
+            if (isNetworkConnected) {
+                refreshNetworkInfo()
+            }
+        }
+        
+        // Cleanup on dispose
+        onDispose {
+            connectivityManager.unregisterNetworkCallback(networkCallback)
+        }
+    }
+
+    // Periodic refresh effect
+    LaunchedEffect(isNetworkConnected) {
+        if (isNetworkConnected) {
+            while (true) {
+                kotlinx.coroutines.delay(10000) // 10 seconds
+                refreshNetworkInfo()
+            }
+        }
+    }
+
+    // Auto-connect settings effect
     LaunchedEffect(Unit) {
         val current = repo.get()
         if (current != null) {
@@ -834,43 +956,31 @@ private fun AutoConnectPage(
             ) {
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
                         ) {
-                            Text(
-                                text = "Auto Connect Settings",
-                                style = MaterialTheme.typography.titleLarge,
-                                color = getPrimaryTextColor(isDarkTheme),
-                                fontWeight = FontWeight.Bold
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-
-                            // Auto Connect Toggle
+                            // Auto Connect Toggle - text and switch aligned horizontally
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Auto Connect",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = getPrimaryTextColor(isDarkTheme),
-                                        fontWeight = FontWeight.SemiBold
-                                    )
-                                    Text(
-                                        text = "Automatically connect to VPN",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = getSecondaryTextColor()
-                                    )
-                                }
+                                Text(
+                                    text = "Auto Connect Settings",
+                                    style = MaterialTheme.typography.titleLarge,
+                                    color = getPrimaryTextColor(isDarkTheme),
+                                    fontWeight = FontWeight.Bold
+                                )
                                 Switch(
                                     checked = autoConnectEnabled,
                                     onCheckedChange = { enabled ->
                                         autoConnectEnabled = enabled
-                                        scope.launch { repo.set(autoConnectEnabled, mode) }
+                                        scope.launch { 
+                                            repo.set(autoConnectEnabled, mode)
+                                        }
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color(0xFFFF6B35),
@@ -885,7 +995,8 @@ private fun AutoConnectPage(
                 if (autoConnectEnabled) {
                     item {
                         StyledCard(
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth(),
+                            isDarkTheme = isDarkTheme
                         ) {
                             Column(
                                 modifier = Modifier.padding(20.dp)
@@ -895,6 +1006,12 @@ private fun AutoConnectPage(
                                     style = MaterialTheme.typography.titleMedium,
                                     color = getPrimaryTextColor(isDarkTheme),
                                     fontWeight = FontWeight.SemiBold
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Choose when to automatically connect to VPN",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = getSecondaryTextColor()
                                 )
                                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -910,46 +1027,14 @@ private fun AutoConnectPage(
                                         selected = mode == value,
                                         onSelect = {
                                             mode = value
-                                            scope.launch { repo.set(autoConnectEnabled, mode) }
+                                            scope.launch { 
+                                                repo.set(autoConnectEnabled, mode)
+                                            }
                                         },
                                         isDarkTheme = isDarkTheme
                                     )
                                     Spacer(modifier = Modifier.height(8.dp))
                                 }
-                            }
-                        }
-                    }
-
-                    item {
-                        StyledCard(
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(
-                                modifier = Modifier.padding(20.dp)
-                            ) {
-                                Text(
-                                    text = "Trusted Networks",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = getPrimaryTextColor(isDarkTheme),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = "Auto Connect won't connect when on trusted networks",
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = getSecondaryTextColor()
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-
-                                SettingsRow(
-                                    title = "Trusted networks",
-                                    description = "Auto Connect won't connect to your VPN when this device is on a trusted network",
-                                    icon = Icons.Default.Shield,
-                                    onClick = {
-                                        trustedNetworksPermission = true
-                                    },
-                                    isDarkTheme = isDarkTheme
-                                )
                             }
                         }
                     }
@@ -1012,7 +1097,8 @@ private fun KillSwitchPage(
             ) {
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1067,7 +1153,8 @@ private fun KillSwitchPage(
 
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1155,7 +1242,8 @@ private fun SubscriptionPage(
             ) {
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1207,7 +1295,8 @@ private fun SubscriptionPage(
 
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1255,10 +1344,35 @@ private fun SecurityPage(
     onBack: () -> Unit,
     onThemeToggle: () -> Unit
 ) {
-    var adBlockEnabled by remember { mutableStateOf(true) }
-    var malwareBlockEnabled by remember { mutableStateOf(true) }
-    var familyModeEnabled by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val vpnManager = remember { VPNManager.getInstance(context) }
+    
+    // Load initial security settings
+    val (initialAdBlock, initialMalware, initialFamily) = remember { vpnManager.getSecuritySettings() }
+    
+    // Security features state
+    var adBlockEnabled by remember { mutableStateOf(initialAdBlock) }
+    var malwareBlockEnabled by remember { mutableStateOf(initialMalware) }
+    var familyModeEnabled by remember { mutableStateOf(initialFamily) }
     var dnsLeakProtectionEnabled by remember { mutableStateOf(true) }
+
+    // Update VPN settings when security features change
+    LaunchedEffect(adBlockEnabled, malwareBlockEnabled, familyModeEnabled) {
+        try {
+            // Save new settings
+            vpnManager.saveSecuritySettings(
+                adBlockEnabled = adBlockEnabled,
+                malwareBlockEnabled = malwareBlockEnabled,
+                familyModeEnabled = familyModeEnabled
+            )
+            
+            // Update VPN connection with new settings
+            val currentServer = VPNConfig.defaultServer
+            vpnManager.connect(currentServer)
+        } catch (e: Exception) {
+            Log.e("SecurityPage", "Failed to update VPN settings", e)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -1304,7 +1418,8 @@ private fun SecurityPage(
             ) {
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1389,8 +1504,8 @@ private fun SplitTunnelingPage(
     val installedApps by remember {
         derivedStateOf {
             try {
-                val apps = AppUtils.getFilteredApps(context, showSystemApps)
-                apps
+                // Always filter apps based on system apps toggle when in split tunneling screen
+                AppUtils.getFilteredApps(context, showSystemApps)
             } catch (e: Exception) {
                 emptyList()
             }
@@ -1441,7 +1556,8 @@ private fun SplitTunnelingPage(
             ) {
                 item {
                     StyledCard(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        isDarkTheme = isDarkTheme
                     ) {
                         Column(
                             modifier = Modifier.padding(20.dp)
@@ -1493,104 +1609,114 @@ private fun SplitTunnelingPage(
 
                 if (splitTunnelingEnabled) {
                     item {
-                                Text(
-                                    text = "Select Apps",
-                                    style = MaterialTheme.typography.titleMedium,
-                                    color = getPrimaryTextColor(isDarkTheme),
+                        Text(
+                            text = "Select Apps",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = getPrimaryTextColor(isDarkTheme),
                             fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.padding(top = 24.dp, bottom = 16.dp)
-                                )
+                        )
                     }
 
                     item {
-                                // Add filter toggle for system apps
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(bottom = 16.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Show System Apps",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = getSecondaryTextColor(),
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Switch(
-                                        checked = showSystemApps,
-                                        onCheckedChange = { showSystemApps = it },
-                                        colors = SwitchDefaults.colors(
-                                            checkedThumbColor = Color(0xFFFF6B35),
-                                            checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
-                                        )
-                                    )
+                        // Add filter toggle for system apps
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Show System Apps",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = getSecondaryTextColor(),
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = showSystemApps,
+                                onCheckedChange = { showSystemApps = it },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color(0xFFFF6B35),
+                                    checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
+                                )
+                            )
                         }
-                                }
-
-                    item {
-                                // App count
-                                Text(
-                                    text = "${installedApps.size} apps found",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = getSecondaryTextColor(),
-                                    modifier = Modifier.padding(bottom = 16.dp)
-                                )
                     }
 
-                                    items(
-                                        items = installedApps,
-                                        key = { it.packageName }
-                                    ) { app ->
-                                        val isSelected = selectedApps.contains(app.packageName)
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                selectedApps = if (isSelected) {
-                                                        selectedApps - app.packageName
-                                                } else {
-                                                        selectedApps + app.packageName
-                                                }
-                                            }
-                                            .padding(vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                            AppIcon(
-                                                drawable = app.appIcon,
-                                            tint = if (isSelected) Color(0xFFFF6B35) else getSecondaryTextColor()
-                                        )
-                                        Spacer(modifier = Modifier.width(16.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                        Text(
-                                                    text = app.appName,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
-                                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                                        )
-                                                if (app.isSystemApp) {
-                                                    Text(
-                                                        text = "System App",
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = getSecondaryTextColor(),
-                                                        fontSize = 10.sp
-                                                    )
-                                                }
-                                            }
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Checkbox(
-                                            checked = isSelected,
-                                            onCheckedChange = {
-                                                selectedApps = if (isSelected) {
-                                                        selectedApps - app.packageName
-                                                } else {
-                                                        selectedApps + app.packageName
-                                                }
-                                            },
-                                            colors = CheckboxDefaults.colors(
-                                                checkedColor = Color(0xFFFF6B35),
-                                                uncheckedColor = getSecondaryTextColor()
-                                            )
-                                        )
+                    item {
+                        // App count with more detail
+                        val appCounts = AppUtils.getAppCounts(context)
+                        Column(
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        ) {
+                            Text(
+                                text = "${installedApps.size} apps found",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = getSecondaryTextColor()
+                            )
+                            Text(
+                                text = "User: ${appCounts["user"]}, System: ${appCounts["system"]}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = getSecondaryTextColor().copy(alpha = 0.7f),
+                                fontSize = 10.sp
+                            )
+                        }
+                    }
+
+                    items(
+                        items = installedApps,
+                        key = { it.packageName }
+                    ) { app ->
+                        val isSelected = selectedApps.contains(app.packageName)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    selectedApps = if (isSelected) {
+                                        selectedApps - app.packageName
+                                    } else {
+                                        selectedApps + app.packageName
+                                    }
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppIcon(
+                                drawable = app.appIcon,
+                                tint = if (isSelected) Color(0xFFFF6B35) else getSecondaryTextColor()
+                            )
+                            Spacer(modifier = Modifier.width(16.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = app.appName,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = if (isSelected) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor(),
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                                )
+                                if (app.isSystemApp) {
+                                    Text(
+                                        text = "System App",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = getSecondaryTextColor(),
+                                        fontSize = 10.sp
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Checkbox(
+                                checked = isSelected,
+                                onCheckedChange = {
+                                    selectedApps = if (isSelected) {
+                                        selectedApps - app.packageName
+                                    } else {
+                                        selectedApps + app.packageName
+                                    }
+                                },
+                                colors = CheckboxDefaults.colors(
+                                    checkedColor = Color(0xFFFF6B35),
+                                    uncheckedColor = getSecondaryTextColor()
+                                )
+                            )
                         }
                     }
                 }

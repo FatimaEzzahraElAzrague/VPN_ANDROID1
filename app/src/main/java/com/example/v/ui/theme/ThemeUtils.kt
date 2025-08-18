@@ -63,17 +63,32 @@ fun getSecondaryTextColor(): Color {
 
 @Composable
 fun getCardBackgroundColor(isDarkTheme: Boolean): Color {
-    return if (isDarkTheme) DarkGunmetalSecondary else LightWhite
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightWhite
+}
+
+@Composable
+fun getSecondaryCardBackgroundColor(isDarkTheme: Boolean): Color {
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightSeasalt
+}
+
+@Composable
+fun getElevatedCardBackgroundColor(isDarkTheme: Boolean): Color {
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightSeasalt
+}
+
+@Composable
+fun getDarkBlueCardBackgroundColor(isDarkTheme: Boolean): Color {
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightWhite
 }
 
 @Composable
 fun getCircleColor(isDarkTheme: Boolean): Color {
-    return if (isDarkTheme) DarkGunmetal else LightCadetGray
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightCadetGray
 }
 
 @Composable
 fun getSearchBackgroundColor(isDarkTheme: Boolean): Color {
-    return if (isDarkTheme) DarkGunmetal else LightWhite
+    return if (isDarkTheme) Color(0xFF1A1A1A) else LightWhite
 }
 
 @Composable

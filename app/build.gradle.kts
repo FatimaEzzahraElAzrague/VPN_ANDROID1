@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("kotlin-kapt")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -48,6 +49,17 @@ android {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             excludes += "/META-INF/versions/9/OSGI-INF/MANIFEST.MF"
+            excludes += "/META-INF/LICENSE.md"
+            excludes += "/META-INF/LICENSE.txt"
+            excludes += "/META-INF/NOTICE.md"
+            excludes += "/META-INF/NOTICE.txt"
+            excludes += "/META-INF/DEPENDENCIES"
+            excludes += "/META-INF/*.kotlin_module"
+            excludes += "/META-INF/*.version"
+            excludes += "/META-INF/maven/**"
+            excludes += "/META-INF/services/**"
+            excludes += "META-INF/INDEX.LIST"
+            excludes += "META-INF/io.netty.versions.properties"
         }
     }
 
@@ -98,6 +110,9 @@ dependencies {
     // BouncyCastle for cryptography
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
+    
+    // Gson for JSON serialization
+    implementation("com.google.code.gson:gson:2.10.1")
 
     // Official WireGuard Android tunnel AAR
     implementation("com.wireguard.android:tunnel:1.0.20230706")
@@ -113,6 +128,9 @@ dependencies {
     implementation("io.ktor:ktor-client-cio:2.3.7")
     implementation("io.ktor:ktor-client-content-negotiation:2.3.7")
     implementation("io.ktor:ktor-serialization-kotlinx-json:2.3.7")
+    
+    // Kotlinx Serialization
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.0")
 
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:20.7.0")
@@ -123,4 +141,15 @@ dependencies {
 
     // Core library desugaring for Java 9+ APIs and record desugaring support
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+
+    // ML and AI Dependencies for VPN Traffic Analysis
+    implementation("org.pytorch:pytorch_android:1.13.1")
+    implementation("org.pytorch:pytorch_android_torchvision:1.13.1")
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
+    
+    // Note: Jython removed due to compatibility issues with Android
+    // We'll implement AI analysis using pure Kotlin/Java approach
+    
+    // Alternative: Use Weka for ML model loading
+    // implementation("nz.ac.waikato.cms.weka:weka-stable:3.8.6")
 }

@@ -145,14 +145,15 @@ object VPNTheme {
     val LightTextSecondary = LightColors.FrenchGray300
     val LightCardBackground = LightColors.Isabelline
     
-    // Dark mode colors
+    // Dark mode colors - TESTING with bright red to see if this theme is used
     val DarkBackground = DarkColors.Night
-    val DarkSurface = DarkColors.Charcoal
+    val DarkSurface = Color(0xFFFF0000) // BRIGHT RED for testing
     val DarkPrimary = DarkColors.OrangeCrayola
-    val DarkSecondary = DarkColors.Gunmetal
+    val DarkSecondary = Color(0xFFFF0000) // BRIGHT RED for testing
     val DarkTextPrimary = DarkColors.Night900
     val DarkTextSecondary = DarkColors.Night700
-    val DarkCardBackground = DarkColors.Charcoal
+    val DarkCardBackground = Color(0xFFFF0000) // BRIGHT RED for testing
+    val DarkSecondaryCardBackground = Color(0xFFFF0000) // BRIGHT RED for testing
     
     // Accent colors
     val AccentOrange = OrangeAccent

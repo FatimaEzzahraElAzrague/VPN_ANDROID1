@@ -9,6 +9,7 @@ import androidx.annotation.RequiresApi
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.example.v.config.VPNConfig
+import com.example.v.data.VPNApiService
 import com.example.v.models.ClientConfig
 import com.example.v.models.Server
 import com.example.v.vpn.WireGuardVpnService
@@ -56,6 +57,8 @@ class VPNManager(private val context: Context) {
     private var clientConfig: ClientConfig? = null
     private val _clientConfigFlow = MutableStateFlow<ClientConfig?>(null)
     val clientConfigFlow: StateFlow<ClientConfig?> = _clientConfigFlow.asStateFlow()
+    
+    private val vpnApiService = VPNApiService()
     
     init {
         Log.d(TAG, "🔍 DEBUG: VPNManager initialized")
@@ -120,28 +123,38 @@ class VPNManager(private val context: Context) {
         
         _connectionState.value = VPNConnectionState.CONNECTING
         _currentServer.value = server
+
+        // Get security settings from preferences
+        val adBlockEnabled = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+            .getBoolean("ad_block_enabled", true)
+        val malwareBlockEnabled = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+            .getBoolean("malware_block_enabled", true)
+        val familyModeEnabled = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+            .getBoolean("family_mode_enabled", false)
         
         Log.d(TAG, "Starting VPN connection to ${server.city}, ${server.country}")
         Log.d(TAG, "Server endpoint: ${server.wireGuardConfig?.serverEndpoint}")
         
         managerScope.launch {
             try {
-                // Get client configuration based on server
-                clientConfig = when (server.id) {
-                    "france-paris" -> {
-                        Log.d(TAG, "Using Paris client config")
-                        VPNConfig.parisClientConfig
-                    }
-                    "asia-pacific-osaka" -> {
-                        Log.d(TAG, "Using Osaka client config")
-                        VPNConfig.osakaClientConfig
-                    }
-                    else -> {
-                        Log.e(TAG, "Unknown server ID: ${server.id}")
-                        _connectionState.value = VPNConnectionState.ERROR
-                        return@launch
-                    }
-                }
+                // Get VPN configuration from API with security settings
+                val location = getLocationFromServerId(server.id)
+                Log.d(TAG, "🔍 DEBUG: Requesting VPN configuration from API for location: $location")
+                val vpnConfig = vpnApiService.connectVPN(
+                    location = location,
+                    adBlockEnabled = adBlockEnabled,
+                    malwareBlockEnabled = malwareBlockEnabled,
+                    familyModeEnabled = familyModeEnabled
+                )
+                Log.d(TAG, "🔍 DEBUG: Received VPN config from API: ${vpnConfig.server_endpoint}")
+                
+                // Create client configuration from API response
+                clientConfig = ClientConfig(
+                    privateKey = vpnConfig.private_key,
+                    publicKey = vpnConfig.public_key,
+                    address = "${vpnConfig.internal_ip}/32,${vpnConfig.internal_ipv6}/128",
+                    dns = vpnConfig.dns
+                )
                 
                 // Save connection state for auto-connect
                 saveConnectionState(server, clientConfig!!)
@@ -157,7 +170,7 @@ class VPNManager(private val context: Context) {
                 
                 Log.d(TAG, "🔍 DEBUG: Intent created with action: ${intent.action}")
                 Log.d(TAG, "🔍 DEBUG: Server passed to service: ${server.name}")
-                Log.d(TAG, "🔍 DEBUG: Client config passed to service: ${clientConfig?.privateKey?.take(10)}...")
+                Log.d(TAG, "🔍 DEBUG: Client config passed to service: ${vpnConfig.private_key.take(10)}...")
                 
                 Log.d(TAG, "🔍 DEBUG: Starting foreground service...")
                 try {
@@ -249,10 +262,11 @@ class VPNManager(private val context: Context) {
             random.nextBytes(this) 
         }, android.util.Base64.NO_WRAP)
         
+        val ipRandom = java.util.Random()
         return ClientConfig(
             privateKey = privateKeyBase64,
             publicKey = publicKeyBase64,
-            address = "10.0.0.${(2..254).random()}/32" // Random IP in range
+            address = "10.0.0.${ipRandom.nextInt(2, 255)}/32" // Random IP in range
         )
     }
     
@@ -504,6 +518,53 @@ class VPNManager(private val context: Context) {
                 }
             }
         }
+    }
+    
+    /**
+     * Helper method to get location from server ID
+     */
+    private fun getLocationFromServerId(serverId: String): String {
+        return when (serverId) {
+            "paris" -> "paris"
+            "osaka" -> "osaka"
+            "virginia" -> "virginia"
+            "oregon" -> "oregon"
+            "london" -> "london"
+            "frankfurt" -> "frankfurt"
+            "mumbai" -> "mumbai"
+            "seoul" -> "seoul"
+            "saopaulo" -> "saopaulo"
+            else -> serverId // Fallback to server ID if no mapping found
+        }
+    }
+
+    /**
+     * Save security settings
+     */
+    fun saveSecuritySettings(
+        adBlockEnabled: Boolean,
+        malwareBlockEnabled: Boolean,
+        familyModeEnabled: Boolean
+    ) {
+        val prefs = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putBoolean("ad_block_enabled", adBlockEnabled)
+            putBoolean("malware_block_enabled", malwareBlockEnabled)
+            putBoolean("family_mode_enabled", familyModeEnabled)
+            apply()
+        }
+    }
+
+    /**
+     * Get security settings
+     */
+    fun getSecuritySettings(): Triple<Boolean, Boolean, Boolean> {
+        val prefs = context.getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+        return Triple(
+            prefs.getBoolean("ad_block_enabled", true),
+            prefs.getBoolean("malware_block_enabled", true),
+            prefs.getBoolean("family_mode_enabled", false)
+        )
     }
 }
 

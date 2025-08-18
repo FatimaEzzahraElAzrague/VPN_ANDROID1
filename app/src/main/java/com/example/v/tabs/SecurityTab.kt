@@ -1,5 +1,6 @@
 package com.example.v.tabs
 
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,6 +16,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.Color
 import com.example.v.components.AppIcon
 import com.example.v.models.InstalledApp
 import com.example.v.utils.AppUtils
@@ -38,7 +40,10 @@ fun SecurityTab() {
             // Protection Features
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp)
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isSystemInDarkTheme()) Color(0xFF1A1A1A) else MaterialTheme.colorScheme.surface
+                )
             ) {
                 Column(
                     modifier = Modifier.padding(20.dp)
@@ -141,7 +146,10 @@ fun SplitTunnelingCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp)
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSystemInDarkTheme()) Color(0xFF1A1A1A) else MaterialTheme.colorScheme.surface
+        )
     ) {
         Column(
             modifier = Modifier.padding(20.dp)
@@ -227,13 +235,23 @@ fun SplitTunnelingCard(
                         )
                     }
 
-                    // App count
-                    Text(
-                        text = "${installedApps.size} apps found",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    // App count with more detail
+                    val appCounts = AppUtils.getAppCounts(context)
+                    Column(
                         modifier = Modifier.padding(bottom = 8.dp)
-                    )
+                    ) {
+                        Text(
+                            text = "${installedApps.size} apps found",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                        )
+                        Text(
+                            text = "User: ${appCounts["user"]}, System: ${appCounts["system"]}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                            fontSize = 10.sp
+                        )
+                    }
 
                     if (isLoadingApps) {
                         Box(

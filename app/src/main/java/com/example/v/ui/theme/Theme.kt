@@ -32,15 +32,15 @@ private val DarkColorScheme = darkColorScheme(
     primaryContainer = DarkOrangeCrayola.copy(alpha = 0.2f),
     onPrimaryContainer = Color.White,
 
-    secondary = DarkGunmetal,
+                secondary = Color(0xFF1A1A1A),
     onSecondary = Color.White,
 
     background = DarkOxfordBlue,
     onBackground = Color.White,
 
-    surface = DarkSurface,
+                surface = Color(0xFF1A1A1A),
     onSurface = DarkOnSurface,
-    surfaceVariant = DarkGunmetalSecondary,
+                surfaceVariant = Color(0xFF1A1A1A),
     onSurfaceVariant = DarkOnSurfaceSecondary,
 
     error = Color(0xFFCF6679),
