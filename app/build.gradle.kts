@@ -1,13 +1,20 @@
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
     namespace = "com.example.v"
     compileSdk = 36
+    
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        }
+    }
 
     defaultConfig {
         applicationId = "com.example.v"
@@ -83,10 +90,7 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.runtime:runtime-livedata")
 
-    // Room (use stable 2.6.1 to match Kotlin 1.9.x toolchain)
-    implementation("androidx.room:room-runtime:2.6.1")
-    kapt("androidx.room:room-compiler:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
+    // No database needed - simplified VPN app
 
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
@@ -111,11 +115,14 @@ dependencies {
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
     
+    // WireGuard crypto algorithms
+    implementation("com.google.crypto.tink:tink-android:1.7.0") // ChaCha20-Poly1305
+    
     // Gson for JSON serialization
     implementation("com.google.code.gson:gson:2.10.1")
 
-    // Official WireGuard Android tunnel AAR
-    implementation("com.wireguard.android:tunnel:1.0.20230706")
+    // VPN Dependencies - simplified approach without WireGuard library issues
+    // Using standard Android VPN APIs instead
 
     // Networking and JSON
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

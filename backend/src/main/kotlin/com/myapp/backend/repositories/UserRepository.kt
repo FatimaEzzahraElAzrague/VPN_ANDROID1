@@ -15,6 +15,7 @@ data class UserRecord(
     val passwordHash: String,
     val username: String,
     val fullName: String?,
+    val googleId: String?, // Google's unique user ID
     val createdAt: LocalDateTime,
     val updatedAt: LocalDateTime,
     val lastLogin: LocalDateTime?,
@@ -34,6 +35,10 @@ class UserRepository {
     fun findByUsername(username: String): UserRecord? = transaction {
         Users.select { Users.username eq username }.limit(1).firstOrNull()?.toRecord()
     }
+    
+    fun findByGoogleId(googleId: String): UserRecord? = transaction {
+        Users.select { Users.googleId eq googleId }.limit(1).firstOrNull()?.toRecord()
+    }
 
     fun insertInactive(email: String, passwordHash: String, username: String, fullName: String?): Int = transaction {
         val userId = Users.insert {
@@ -50,11 +55,28 @@ class UserRepository {
         logger.info { "✅ User created: ID=$userId, Email=$email, Username=$username, FullName=$fullName" }
         userId
     }
+    
+    fun insertActiveGoogleUser(email: String, passwordHash: String, username: String, fullName: String?, googleId: String): Int = transaction {
+        val userId = Users.insert {
+            it[Users.email] = email
+            it[Users.passwordHash] = passwordHash
+            it[Users.username] = username
+            it[Users.fullName] = fullName
+            it[Users.googleId] = googleId  // Store the Google ID
+            it[Users.createdAt] = LocalDateTime.now()
+            it[Users.updatedAt] = LocalDateTime.now()
+            it[Users.isActive] = true  // Google users are active immediately
+            it[Users.isDeleted] = false
+        } get Users.id
+        
+        logger.info { "✅ Google user created and activated: ID=$userId, Email=$email, Username=$username, FullName=$fullName, GoogleID=$googleId" }
+        userId
+    }
 
     fun activateUser(email: String): Boolean = transaction {
         val updated = Users.update({ Users.email eq email }) {
-            it[isActive] = true
-            it[updatedAt] = LocalDateTime.now()
+            it[Users.isActive] = true
+            it[Users.updatedAt] = LocalDateTime.now()
         } > 0
         
         if (updated) {
@@ -67,30 +89,38 @@ class UserRepository {
 
     fun updateLastLogin(userId: Int) = transaction {
         Users.update({ Users.id eq userId }) {
-            it[lastLogin] = LocalDateTime.now()
+            it[Users.lastLogin] = LocalDateTime.now()
         }
     }
 
     fun updateProfile(userId: Int, username: String?, fullName: String?) = transaction {
-        Users.update({ Users.id eq userId }) { row ->
-            username?.let { row[Users.username] = it }
-            fullName?.let { row[Users.fullName] = it }
-            row[Users.updatedAt] = LocalDateTime.now()
+        Users.update({ Users.id eq userId }) {
+            username?.let { name -> it[Users.username] = name }
+            fullName?.let { name -> it[Users.fullName] = name }
+            it[Users.updatedAt] = LocalDateTime.now()
         }
     }
 
     fun updatePassword(userId: Int, newHash: String) = transaction {
         Users.update({ Users.id eq userId }) {
-            it[passwordHash] = newHash
-            it[updatedAt] = LocalDateTime.now()
+            it[Users.passwordHash] = newHash
+            it[Users.updatedAt] = LocalDateTime.now()
         }
+    }
+    
+    fun linkGoogleAccount(userId: Int, googleId: String) = transaction {
+        Users.update({ Users.id eq userId }) {
+            it[Users.googleId] = googleId
+            it[Users.updatedAt] = LocalDateTime.now()
+        }
+        logger.info { "✅ Google account linked to user: ID=$userId, GoogleID=$googleId" }
     }
 
     fun softDelete(userId: Int) = transaction {
         Users.update({ Users.id eq userId }) {
-            it[isDeleted] = true
-            it[isActive] = false
-            it[updatedAt] = LocalDateTime.now()
+            it[Users.isDeleted] = true
+            it[Users.isActive] = false
+            it[Users.updatedAt] = LocalDateTime.now()
         }
     }
 
@@ -116,6 +146,7 @@ class UserRepository {
         passwordHash = this[Users.passwordHash],
         username = this[Users.username],
         fullName = this[Users.fullName],
+        googleId = this[Users.googleId],
         createdAt = this[Users.createdAt],
         updatedAt = this[Users.updatedAt],
         lastLogin = this[Users.lastLogin],

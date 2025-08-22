@@ -25,7 +25,7 @@ fun ConnectionDetailsPanel(
     modifier: Modifier = Modifier
 ) {
     var sessionDuration by remember { mutableStateOf("00:00:00") }
-    var localIP by remember { mutableStateOf("192.168.1.100") }
+    var localIP by remember { mutableStateOf("Detecting...") }
     var serverIP by remember { mutableStateOf("---") }
 
     LaunchedEffect(Unit) {

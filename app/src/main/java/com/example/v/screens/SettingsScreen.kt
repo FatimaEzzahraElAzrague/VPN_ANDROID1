@@ -50,6 +50,8 @@ import com.example.v.utils.RealTimeSpeedTestResult
 import com.example.v.utils.TestPhase
 import com.example.v.ui.theme.*
 import com.example.v.vpn.VPNManager
+import com.example.v.services.SplitTunnelingService
+import com.example.v.vpn.SplitTunnelingMode
 
 // Extension function to convert RealTimeSpeedTestResult to SpeedTestResults
 private fun RealTimeSpeedTestResult.toSpeedTestResults(): SpeedTestResults {
@@ -904,12 +906,8 @@ private fun AutoConnectPage(
     // Auto-connect settings effect
     LaunchedEffect(Unit) {
         val current = repo.get()
-        if (current != null) {
-            autoConnectEnabled = current.enabled
-            mode = current.mode
-        } else {
-            repo.set(false, com.example.v.data.autoconnect.AutoConnectMode.ANY_WIFI_OR_CELLULAR)
-        }
+        autoConnectEnabled = current.enabled
+        mode = current.mode
     }
 
     Box(
@@ -1139,7 +1137,7 @@ private fun KillSwitchPage(
                                     checked = killSwitchEnabled,
                                     onCheckedChange = {
                                         killSwitchEnabled = it
-                                        com.example.v.data.killswitch.KillSwitchPrefs.setEnabled(context, it)
+                                        com.example.v.data.killswitch.KillSwitchManager.getInstance(context).setEnabled(it)
                                     },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color(0xFFFF6B35),
@@ -1361,14 +1359,12 @@ private fun SecurityPage(
         try {
             // Save new settings
             vpnManager.saveSecuritySettings(
-                adBlockEnabled = adBlockEnabled,
-                malwareBlockEnabled = malwareBlockEnabled,
-                familyModeEnabled = familyModeEnabled
+                adBlock = adBlockEnabled,
+                antiMalware = malwareBlockEnabled,
+                familySafe = familyModeEnabled
             )
             
-            // Update VPN connection with new settings
-            val currentServer = VPNConfig.defaultServer
-            vpnManager.connect(currentServer)
+            // Note: Settings are automatically applied to next connection
         } catch (e: Exception) {
             Log.e("SecurityPage", "Failed to update VPN settings", e)
         }
@@ -1495,12 +1491,18 @@ private fun SplitTunnelingPage(
     onBack: () -> Unit,
     onThemeToggle: () -> Unit
 ) {
-    var splitTunnelingEnabled by remember { mutableStateOf(false) }
-    var selectedApps by remember { mutableStateOf(setOf<String>()) }
+    val context = LocalContext.current
+    val splitTunnelingService = remember { SplitTunnelingService.getInstance(context) }
+    
+    // Observe split tunneling service state
+    val isEnabled by splitTunnelingService.isEnabled.collectAsState()
+    val mode by splitTunnelingService.mode.collectAsState()
+    val selectedApps by splitTunnelingService.selectedApps.collectAsState()
+    val config by splitTunnelingService.config.collectAsState()
+    
     var showSystemApps by remember { mutableStateOf(false) }
     var isLoadingApps by remember { mutableStateOf(false) }
-
-    val context = LocalContext.current
+    var showModeSelector by remember { mutableStateOf(false) }
     val installedApps by remember {
         derivedStateOf {
             try {
@@ -1589,25 +1591,65 @@ private fun SplitTunnelingPage(
                                         fontWeight = FontWeight.SemiBold
                                     )
                                     Text(
-                                        text = "Only selected apps will use VPN",
+                                        text = when (mode) {
+                                            SplitTunnelingMode.INCLUDE -> "Only selected apps will use VPN"
+                                            SplitTunnelingMode.EXCLUDE -> "All apps use VPN except selected ones"
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = getSecondaryTextColor()
                                     )
                                 }
                                 Switch(
-                                    checked = splitTunnelingEnabled,
-                                    onCheckedChange = { splitTunnelingEnabled = it },
+                                    checked = isEnabled,
+                                    onCheckedChange = { splitTunnelingService.setEnabled(it) },
                                     colors = SwitchDefaults.colors(
                                         checkedThumbColor = Color(0xFFFF6B35),
                                         checkedTrackColor = Color(0xFFFF6B35).copy(alpha = 0.5f)
                                     )
                                 )
                             }
+                            
+                            if (isEnabled) {
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                // Mode selector
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = "Tunneling Mode",
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = getPrimaryTextColor(isDarkTheme),
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Text(
+                                            text = when (mode) {
+                                                SplitTunnelingMode.INCLUDE -> "Include Mode: Only selected apps use VPN"
+                                                SplitTunnelingMode.EXCLUDE -> "Exclude Mode: All apps use VPN except selected ones"
+                                            },
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = getSecondaryTextColor()
+                                        )
+                                    }
+                                    IconButton(onClick = { showModeSelector = true }) {
+                                        Icon(
+                                            imageVector = Icons.Default.Settings,
+                                            contentDescription = "Change Mode",
+                                            tint = Color(0xFFFF6B35)
+                                        )
+                                    }
+                                }
+                                
+
+                            }
                         }
                     }
                 }
 
-                if (splitTunnelingEnabled) {
+                if (isEnabled) {
                     item {
                         Text(
                             text = "Select Apps",
@@ -1663,7 +1705,7 @@ private fun SplitTunnelingPage(
                         }
                     }
 
-                    items(
+                                            items(
                         items = installedApps,
                         key = { it.packageName }
                     ) { app ->
@@ -1672,10 +1714,10 @@ private fun SplitTunnelingPage(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    selectedApps = if (isSelected) {
-                                        selectedApps - app.packageName
+                                    if (isSelected) {
+                                        splitTunnelingService.removeApps(listOf(app.packageName))
                                     } else {
-                                        selectedApps + app.packageName
+                                        splitTunnelingService.addApps(listOf(app.packageName))
                                     }
                                 }
                                 .padding(vertical = 8.dp),
@@ -1706,10 +1748,10 @@ private fun SplitTunnelingPage(
                             Checkbox(
                                 checked = isSelected,
                                 onCheckedChange = {
-                                    selectedApps = if (isSelected) {
-                                        selectedApps - app.packageName
+                                    if (isSelected) {
+                                        splitTunnelingService.removeApps(listOf(app.packageName))
                                     } else {
-                                        selectedApps + app.packageName
+                                        splitTunnelingService.addApps(listOf(app.packageName))
                                     }
                                 },
                                 colors = CheckboxDefaults.colors(
@@ -1722,12 +1764,64 @@ private fun SplitTunnelingPage(
                 }
             }
         }
+        
+        // Mode Selector Dialog
+        if (showModeSelector) {
+            AlertDialog(
+                onDismissRequest = { showModeSelector = false },
+                title = {
+                    Text(
+                        text = "Select Tunneling Mode",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = getPrimaryTextColor(isDarkTheme)
+                    )
+                },
+                text = {
+                    Column {
+                        RadioOption(
+                            text = "Include Mode",
+                            description = "Only selected apps use VPN",
+                            selected = mode == SplitTunnelingMode.INCLUDE,
+                            onSelect = { 
+                                splitTunnelingService.setMode(SplitTunnelingMode.INCLUDE)
+                                showModeSelector = false
+                            },
+                            isDarkTheme = isDarkTheme
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        RadioOption(
+                            text = "Exclude Mode",
+                            description = "All apps use VPN except selected ones",
+                            selected = mode == SplitTunnelingMode.EXCLUDE,
+                            onSelect = { 
+                                splitTunnelingService.setMode(SplitTunnelingMode.EXCLUDE)
+                                showModeSelector = false
+                            },
+                            isDarkTheme = isDarkTheme
+                        )
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = { showModeSelector = false }) {
+                        Text("Cancel")
+                    }
+                },
+                containerColor = getCardBackgroundColor(isDarkTheme),
+                titleContentColor = getPrimaryTextColor(isDarkTheme),
+                textContentColor = getSecondaryTextColor()
+            )
+        }
+        
+
     }
 }
+
+
 
 @Composable
 private fun RadioOption(
     text: String,
+    description: String? = null,
     selected: Boolean,
     onSelect: () -> Unit,
     isDarkTheme: Boolean,
@@ -1749,11 +1843,22 @@ private fun RadioOption(
             )
         )
         Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = if (enabled) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor().copy(alpha = 0.5f)
-        )
+        Column {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (enabled) getPrimaryTextColor(isDarkTheme) else getSecondaryTextColor().copy(alpha = 0.5f),
+                fontWeight = FontWeight.SemiBold
+            )
+            if (description != null) {
+                Text(
+                    text = description,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = getSecondaryTextColor(),
+                    fontSize = 12.sp
+                )
+            }
+        }
     }
 }
 

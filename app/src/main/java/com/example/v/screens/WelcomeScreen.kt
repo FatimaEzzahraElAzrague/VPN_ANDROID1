@@ -10,6 +10,7 @@ import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,6 +24,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.media3.common.util.UnstableApi
 import com.example.v.components.VideoPlayer
 import com.example.v.ui.theme.*
+import com.example.v.auth.AuthManager
 
 @androidx.annotation.OptIn(UnstableApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
@@ -33,6 +35,14 @@ fun WelcomeScreen(
 ) {
     val context = LocalContext.current
     val videoUri = remember { Uri.parse("android.resource://${context.packageName}/raw/background_video") }
+    
+    // Check if user is already logged in
+    LaunchedEffect(Unit) {
+        if (AuthManager.isLoggedIn()) {
+            // User is already logged in, proceed to main app
+            onSignInClick() // This will navigate to the main app
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         VideoPlayer(

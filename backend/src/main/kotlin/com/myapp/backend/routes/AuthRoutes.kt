@@ -8,6 +8,7 @@ import com.myapp.backend.repositories.UserRepository
 import com.myapp.backend.services.EmailService
 import com.myapp.backend.services.GoogleAuthService
 import com.myapp.backend.services.OtpService
+import com.myapp.backend.services.SessionService
 import com.myapp.backend.util.Validation
 import io.ktor.http.*
 import io.ktor.server.application.*
@@ -15,6 +16,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import java.time.format.DateTimeFormatter
+import java.security.SecureRandom
 import mu.KotlinLogging
 import de.mkammerer.argon2.Argon2Factory
 
@@ -104,7 +106,7 @@ fun Route.authRoutes() {
         if (!argonOk && !bcryptOk) { call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_credentials")); return@post }
 
         users.updateLastLogin(user.id)
-        val token = JwtProvider.createAccessToken(user.id)
+        val token = SessionService.createSession(user.id, user.email, user.username, user.fullName, isGoogleUser = false)
         val profile = ProfileResponse(
             id = user.id, email = user.email, username = user.username, full_name = user.fullName,
             created_at = user.createdAt.format(dtf), updated_at = user.updatedAt.format(dtf), last_login = user.lastLogin?.format(dtf)
@@ -112,7 +114,7 @@ fun Route.authRoutes() {
         call.respond(HttpStatusCode.OK, mapOf("token" to TokenResponse(token, expires_in = Env.jwtExpSeconds), "profile" to profile))
     }
 
-    // Google route unchanged below...
+    // Google Authentication - Sign up and Sign in
     post("/google-auth") {
         val body = runCatching { call.receive<GoogleAuthRequest>() }.getOrElse {
             logger.warn { "❌ Invalid JSON in Google auth request" }
@@ -121,7 +123,14 @@ fun Route.authRoutes() {
         
         logger.info { "🔐 Google auth attempt with ID token" }
         
-        val idToken = googleService.verifyIdToken(body.id_token)
+        val idToken = try {
+            googleService.verifyIdToken(body.id_token)
+        } catch (e: Exception) {
+            logger.error { "❌ Google token verification failed: ${e.message}" }
+            call.respond(HttpStatusCode.InternalServerError, mapOf("error" to "google_verification_failed", "details" to e.message))
+            return@post
+        }
+        
         if (idToken == null) { 
             logger.warn { "❌ Invalid Google ID token" }
             call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_id_token")); return@post 
@@ -130,36 +139,69 @@ fun Route.authRoutes() {
         val payload = idToken.payload
         val email = payload.email
         val name = payload["name"] as String?
+        val googleId = payload.subject // Google's unique user ID
         
-        logger.info { "🔍 Checking for existing user: Email=$email, Name=$name" }
+        logger.info { "🔍 Checking for existing user: Email=$email, Name=$name, GoogleID=$googleId" }
         
-        var user = users.findByEmail(email)
+        // First check if user exists by Google ID (for users who signed up with Google before)
+        var user = users.findByGoogleId(googleId)
+        if (user == null) {
+            // Then check by email (for users who might have signed up with email first)
+            val emailUser = users.findByEmail(email)
+            if (emailUser != null) {
+                // User exists but doesn't have Google ID - link the accounts
+                logger.info { "🔗 Linking existing email user to Google: ID=${emailUser.id}, Email=$email" }
+                users.linkGoogleAccount(emailUser.id, googleId)
+                user = emailUser
+            }
+        }
+        
         if (user == null) {
             logger.info { "🆕 Creating new user from Google auth: Email=$email" }
             
-            val suggestedUsername = email.substringBefore('@')
-            val base = suggestedUsername.take(20)
-            var candidate = base
+            // Generate unique username from email
+            val suggestedUsername = email.substringBefore('@').take(20)
+            var candidate = suggestedUsername
             var suffix = 1
             while (users.findByUsername(candidate) != null) {
-                candidate = "$base$suffix"
+                candidate = "${suggestedUsername.take(15)}$suffix"
                 suffix++
+                if (suffix > 999) break // Prevent infinite loop
             }
             
-            val randomPasswordHash = BCrypt.withDefaults().hashToString(12, (payload.subject + System.nanoTime()).toCharArray())
-            val id = users.insertInactive(email, randomPasswordHash, candidate, name)
-            // Don't activate user automatically - require email verification
+            // Create a secure password hash using Google ID + timestamp
+            val securePassword = "$googleId-${System.currentTimeMillis()}-${SecureRandom().nextLong()}"
+            val passwordHash = BCrypt.withDefaults().hashToString(12, securePassword.toCharArray())
+            
+            // Insert user as ACTIVE (Google users don't need email verification)
+            val id = users.insertActiveGoogleUser(email, passwordHash, candidate, name, googleId)
             user = users.findById(id)
             
-            logger.info { "✅ New user created from Google (inactive): ID=$id, Email=$email, Username=$candidate" }
+            logger.info { "✅ New Google user created and activated: ID=$id, Email=$email, Username=$candidate" }
+            
+            // Create session and return success immediately (no verification needed)
+            val token = SessionService.createSession(user.id, user.email, user.username, user.fullName, isGoogleUser = true)
+            val profile = ProfileResponse(
+                id = user.id, email = user.email, username = user.username, full_name = user.fullName,
+                created_at = user.createdAt.format(dtf), updated_at = user.updatedAt.format(dtf), last_login = user.lastLogin?.format(dtf)
+            )
+            
             call.respond(HttpStatusCode.Created, mapOf(
-                "message" to "Account created successfully. Please verify your email to activate your account.",
-                "email" to email,
-                "requires_verification" to true
+                "message" to "Google account created successfully!",
+                "token" to TokenResponse(access_token = token, expires_in = Env.jwtExpSeconds),
+                "profile" to profile,
+                "is_new_user" to true
             ))
             return@post
+            
         } else {
             logger.info { "✅ Existing user found: ID=${user.id}, Email=$email" }
+            
+            // Update last login and user info
+            users.updateLastLogin(user.id)
+            if (name != null && user.fullName != name) {
+                users.updateProfile(user.id, user.username, name)
+            }
         }
         
         if (user == null) { 
@@ -177,9 +219,75 @@ fun Route.authRoutes() {
             call.respond(HttpStatusCode.Forbidden, mapOf("error" to "inactive_user")); return@post
         }
         
-        val token = JwtProvider.createAccessToken(user.id)
+        // Create session and return user profile
+        val token = SessionService.createSession(user.id, user.email, user.username, user.fullName, isGoogleUser = true)
+        val profile = ProfileResponse(
+            id = user.id, email = user.email, username = user.username, full_name = user.fullName,
+            created_at = user.createdAt.format(dtf), updated_at = user.updatedAt.format(dtf), last_login = user.lastLogin?.format(dtf)
+        )
+        
         logger.info { "✅ Google auth successful: UserID=${user.id}, Email=$email" }
-        call.respond(HttpStatusCode.OK, TokenResponse(access_token = token, expires_in = Env.jwtExpSeconds))
+        call.respond(HttpStatusCode.OK, mapOf(
+            "message" to "Welcome back!",
+            "token" to TokenResponse(access_token = token, expires_in = Env.jwtExpSeconds),
+            "profile" to profile,
+            "is_new_user" to false
+        ))
+    }
+    
+    // Refresh token endpoint for better user experience
+    post("/refresh-token") {
+        val authHeader = call.request.header("Authorization")
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "missing_token"))
+            return@post
+        }
+        
+        val token = authHeader.substringAfter("Bearer ")
+        try {
+            val userId = JwtProvider.getUserIdFromToken(token)
+            val user = users.findById(userId)
+            
+            if (user == null || user.isDeleted || !user.isActive) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_user"))
+                return@post
+            }
+            
+            // Generate new token and session
+            val newToken = SessionService.createSession(user.id, user.email, user.username, user.fullName, isGoogleUser = false)
+            val profile = ProfileResponse(
+                id = user.id, email = user.email, username = user.username, full_name = user.fullName,
+                created_at = user.createdAt.format(dtf), updated_at = user.updatedAt.format(dtf), last_login = user.lastLogin?.format(dtf)
+            )
+            
+            call.respond(HttpStatusCode.OK, mapOf(
+                "message" to "Token refreshed successfully",
+                "token" to TokenResponse(access_token = newToken, expires_in = Env.jwtExpSeconds),
+                "profile" to profile
+            ))
+            
+        } catch (e: Exception) {
+            logger.warn { "❌ Token refresh failed: ${e.message}" }
+            call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "invalid_token"))
+        }
+    }
+    
+    // Logout endpoint (optional - for better security)
+    post("/logout") {
+        val authHeader = call.request.header("Authorization")
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out successfully"))
+            return@post
+        }
+        
+        val token = authHeader.substringAfter("Bearer ")
+        val removed = SessionService.removeSession(token)
+        
+        if (removed) {
+            logger.info { "✅ User logged out successfully" }
+        }
+        
+        call.respond(HttpStatusCode.OK, mapOf("message" to "Logged out successfully"))
     }
 
     // Debug endpoint to view all users (remove in production)
@@ -187,6 +295,36 @@ fun Route.authRoutes() {
         val allUsers = users.getAllUsers()
         logger.info { "📊 Debug: Found ${allUsers.size} users in database" }
         call.respond(HttpStatusCode.OK, mapOf("users" to allUsers))
+    }
+    
+    // Debug endpoint to view active sessions (remove in production)
+    get("/debug/sessions") {
+        val activeCount = SessionService.getActiveSessionCount()
+        logger.info { "📊 Debug: Active sessions: $activeCount" }
+        call.respond(HttpStatusCode.OK, mapOf(
+            "active_sessions" to activeCount,
+            "message" to "Session management is working"
+        ))
+    }
+    
+    // Test database connection
+    get("/debug/db-test") {
+        try {
+            val userCount = users.getAllUsers().size
+            call.respond(HttpStatusCode.OK, mapOf(
+                "status" to "success",
+                "message" to "Database connection working",
+                "user_count" to userCount,
+                "database" to "Neon PostgreSQL"
+            ))
+        } catch (e: Exception) {
+            logger.error { "❌ Database connection failed: ${e.message}" }
+            call.respond(HttpStatusCode.InternalServerError, mapOf(
+                "status" to "error",
+                "error" to "database_connection_failed",
+                "details" to e.message
+            ))
+        }
     }
 }
 

@@ -35,7 +35,7 @@ class AutoConnectManager(
 
     private fun checkAndConnect() {
         scope.launch {
-            val settings = repo.get() ?: return@launch
+            val settings = repo.get()
             if (!settings.enabled) return@launch
 
             val network = cm.activeNetwork ?: return@launch

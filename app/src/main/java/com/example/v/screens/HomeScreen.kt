@@ -31,6 +31,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.example.v.R
 import com.example.v.components.ServerLocationCard
 import com.example.v.components.ConnectionDetailsPanel
+import com.example.v.components.SplitTunnelingStatus
+import com.example.v.components.ProxyStatusComponent
 import com.example.v.models.Server
 import com.example.v.ui.theme.VPNTheme
 import com.example.v.ui.theme.getGradientBackground
@@ -76,7 +78,7 @@ fun HomeScreen(
     val vpnConnectionState by remember(vpnManager) {
         vpnManager.connectionState
     }.collectAsState()
-    isConnected = vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTED
+    isConnected = vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTED
     
     // UI state
     val scrollState = rememberScrollState()
@@ -90,7 +92,10 @@ fun HomeScreen(
         println("🔍 DEBUG: VPN permission result received. granted=$granted")
         if (granted) {
             println("🔍 DEBUG: Permission granted via dialog. Connecting now...")
-            vpnManager.connect(currentServer)
+            // Launch coroutine for suspend function
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                vpnManager.connect(currentServer.id)
+            }
         } else {
             println("🔍 DEBUG: Permission denied by user.")
         }
@@ -155,11 +160,11 @@ fun HomeScreen(
         println("🔍 DEBUG: handleConnect function called")
         println("🔍 DEBUG: Current state: $vpnConnectionState")
         
-        if (vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTED) {
+        if (vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTED) {
             // Disconnect
             println("🔍 DEBUG: Disconnecting VPN")
             onDisconnect()
-        } else if (vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTING) {
+        } else if (vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTING) {
             println("🔍 DEBUG: VPN is already connecting...")
             return
         } else {
@@ -182,7 +187,10 @@ fun HomeScreen(
                 // Connect directly to current server
                 println("🔍 DEBUG: ✅ Has permission, connecting to ${currentServer.city}")
                 println("🔍 DEBUG: Calling vpnManager.connect() now...")
-                vpnManager.connect(currentServer)
+                // Launch coroutine for suspend function
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    vpnManager.connect(currentServer.id)
+                }
                 println("🔍 DEBUG: vpnManager.connect() call completed")
             } else {
                 // Request VPN permission
@@ -197,7 +205,10 @@ fun HomeScreen(
                     println("🔍 DEBUG: ❌ permissionIntent is null - this should not happen!")
                     // Try to connect anyway - permission might already be granted
                     println("🔍 DEBUG: Attempting to connect anyway...")
-                    vpnManager.connect(currentServer)
+                    // Launch coroutine for suspend function
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        vpnManager.connect(currentServer.id)
+                    }
                 }
             }
         }
@@ -253,7 +264,7 @@ fun HomeScreen(
                     // Central Connect Button
                     ConnectButton(
                         isConnected = isConnected,
-                        isConnecting = vpnConnectionState == com.example.v.vpn.VPNConnectionState.CONNECTING,
+                        isConnecting = vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTING,
                         onClick = { 
                             println("🔍 DEBUG: Connect button clicked!")
                             println("🔍 DEBUG: Button state - isConnected: $isConnected")
@@ -284,6 +295,22 @@ fun HomeScreen(
                             server = connectedServer,
                             sessionDuration = sessionDuration,
                             localTunnelIp = vpnManager.getLocalTunnelIpv4(),
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Split Tunneling Status
+                        SplitTunnelingStatus(
+                            isDarkTheme = isDarkTheme,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        
+                        Spacer(modifier = Modifier.height(16.dp))
+                        
+                        // Proxy Status Component
+                        ProxyStatusComponent(
+                            isDarkTheme = isDarkTheme,
                             modifier = Modifier.fillMaxWidth()
                         )
                     }
@@ -424,10 +451,11 @@ private fun ServerSelectionCard(
                         fontWeight = FontWeight.Medium,
                         color = if (isDarkTheme) MaterialTheme.colorScheme.onSurface else Color.Black
                     )
+                    // Server info
                     Text(
-                        text = "Ping: ${server.ping}ms • Load: ${server.load}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isDarkTheme) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
+                        text = "${server.ip}:${server.port}",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isDarkTheme) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
                     )
                 }
             }
@@ -565,7 +593,7 @@ private fun ConnectionDetailsCard(
                 Row(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    val endpoint = server.wireGuardConfig?.serverEndpoint ?: "---"
+                    val endpoint = "${server.ip}:${server.port}"
                     Text(
                         text = endpoint,
                         style = MaterialTheme.typography.bodySmall,

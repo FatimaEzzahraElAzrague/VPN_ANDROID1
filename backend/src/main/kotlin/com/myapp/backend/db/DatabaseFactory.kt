@@ -4,6 +4,8 @@ import com.myapp.backend.config.Env
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.transactions.TransactionManager
 import java.sql.Connection
 import java.net.URI
@@ -45,6 +47,34 @@ object DatabaseFactory {
         dataSource = HikariDataSource(config)
         Database.connect(dataSource)
         TransactionManager.manager.defaultIsolationLevel = Connection.TRANSACTION_REPEATABLE_READ
+        
+        // Create tables if they don't exist
+        createTables()
+    }
+    
+    private fun createTables() {
+        transaction {
+            try {
+                // Check if google_id column exists
+                val hasGoogleIdColumn = try {
+                    exec("SELECT google_id FROM users LIMIT 1") { }
+                    true
+                } catch (e: Exception) {
+                    false
+                }
+                
+                if (!hasGoogleIdColumn) {
+                    println("🔄 Adding google_id column to users table...")
+                    exec("ALTER TABLE users ADD COLUMN google_id VARCHAR(255) UNIQUE")
+                    println("✅ google_id column added successfully")
+                }
+                
+                SchemaUtils.create(Users, AutoConnectTable)
+                println("✅ Database tables created successfully")
+            } catch (e: Exception) {
+                println("⚠️ Tables might already exist: ${e.message}")
+            }
+        }
     }
 }
 

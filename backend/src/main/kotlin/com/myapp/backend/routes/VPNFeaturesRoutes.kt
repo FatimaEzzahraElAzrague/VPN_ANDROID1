@@ -2,6 +2,7 @@ package com.myapp.backend.routes
 
 import com.myapp.backend.models.*
 import com.myapp.backend.services.SpeedTestService
+import com.myapp.backend.services.SplitTunnelingService
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -11,6 +12,7 @@ import java.util.*
 
 fun Route.vpnFeaturesRoutes() {
     val speedTestService = SpeedTestService.getInstance()
+    val splitTunnelingService = SplitTunnelingService.getInstance()
     
     // Speed Test Routes
     route("/speedtest") {
@@ -232,14 +234,7 @@ fun Route.vpnFeaturesRoutes() {
                     mapOf("error" to "User ID is required")
                 )
                 
-                // For now, return a basic response - implement actual service later
-                val config = SplitTunnelingConfig(userId = userId)
-                val response = SplitTunnelingConfigResponse(
-                    config = config,
-                    availableApps = emptyList(),
-                    presets = emptyList()
-                )
-                
+                val response = splitTunnelingService.getSplitTunnelingConfig(userId)
                 call.respond(HttpStatusCode.OK, response)
                 
             } catch (e: Exception) {
@@ -264,13 +259,7 @@ fun Route.vpnFeaturesRoutes() {
                 
                 val request = call.receive<SplitTunnelingRequest>()
                 
-                // For now, return a basic response - implement actual service later
-                val config = SplitTunnelingConfig(
-                    userId = userId,
-                    isEnabled = request.isEnabled ?: false,
-                    mode = request.mode ?: SplitTunnelingMode.EXCLUDE,
-                    appPackages = request.appPackages ?: emptyList()
-                )
+                val config = splitTunnelingService.updateSplitTunnelingConfig(userId, request)
                 
                 call.respond(HttpStatusCode.OK, SplitTunnelingResponse(
                     success = true,
@@ -297,25 +286,7 @@ fun Route.vpnFeaturesRoutes() {
          */
         get("/presets") {
             try {
-                // Return some example presets
-                val presets = listOf(
-                    SplitTunnelingPreset(
-                        id = "banking",
-                        name = "Banking Apps Only",
-                        description = "Only banking apps use VPN",
-                        mode = SplitTunnelingMode.INCLUDE,
-                        appPackages = listOf("com.chase.smartphone", "com.wellsfargo.mobile"),
-                        category = "Security"
-                    ),
-                    SplitTunnelingPreset(
-                        id = "streaming",
-                        name = "Exclude Streaming",
-                        description = "All apps use VPN except streaming apps",
-                        mode = SplitTunnelingMode.EXCLUDE,
-                        appPackages = listOf("com.netflix.mediaclient", "com.spotify.music"),
-                        category = "Entertainment"
-                    )
-                )
+                val presets = splitTunnelingService.getDefaultPresets()
                 
                 call.respond(HttpStatusCode.OK, mapOf(
                     "success" to true,
@@ -327,6 +298,128 @@ fun Route.vpnFeaturesRoutes() {
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to "Failed to get split tunneling presets")
+                )
+            }
+        }
+        
+        /**
+         * POST /splittunneling/preset/{userId}/{presetId}
+         * Apply a preset to user's configuration
+         */
+        post("/preset/{userId}/{presetId}") {
+            try {
+                val userId = call.parameters["userId"] ?: return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "User ID is required")
+                )
+                
+                val presetId = call.parameters["presetId"] ?: return@post call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Preset ID is required")
+                )
+                
+                val config = splitTunnelingService.applyPreset(userId, presetId)
+                
+                call.respond(HttpStatusCode.OK, SplitTunnelingResponse(
+                    success = true,
+                    message = "Preset applied successfully",
+                    config = config
+                ))
+                
+            } catch (e: Exception) {
+                call.application.environment.log.error("Error applying preset", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    SplitTunnelingResponse(
+                        success = false,
+                        message = "Failed to apply preset",
+                        error = e.message
+                    )
+                )
+            }
+        }
+        
+        /**
+         * GET /splittunneling/analytics/{userId}
+         * Get split tunneling analytics for a user
+         */
+        get("/analytics/{userId}") {
+            try {
+                val userId = call.parameters["userId"] ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "User ID is required")
+                )
+                
+                val periodStr = call.request.queryParameters["period"] ?: "DAY"
+                val period = try {
+                    AnalyticsPeriod.valueOf(periodStr.uppercase())
+                } catch (e: IllegalArgumentException) {
+                    AnalyticsPeriod.DAY
+                }
+                
+                val analytics = splitTunnelingService.getSplitTunnelingAnalytics(userId, period)
+                
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "success" to true,
+                    "analytics" to analytics
+                ))
+                
+            } catch (e: Exception) {
+                call.application.environment.log.error("Error getting split tunneling analytics", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Failed to get split tunneling analytics")
+                )
+            }
+        }
+        
+        /**
+         * GET /splittunneling/apps/search
+         * Search apps by name or package
+         */
+        get("/apps/search") {
+            try {
+                val query = call.request.queryParameters["q"] ?: return@get call.respond(
+                    HttpStatusCode.BadRequest,
+                    mapOf("error" to "Search query is required")
+                )
+                
+                val apps = splitTunnelingService.searchApps(query)
+                
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "success" to true,
+                    "apps" to apps,
+                    "count" to apps.size
+                ))
+                
+            } catch (e: Exception) {
+                call.application.environment.log.error("Error searching apps", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Failed to search apps")
+                )
+            }
+        }
+        
+        /**
+         * GET /splittunneling/apps/popular
+         * Get popular apps for split tunneling
+         */
+        get("/apps/popular") {
+            try {
+                val apps = splitTunnelingService.getPopularApps()
+                
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "success" to true,
+                    "apps" to apps,
+                    "count" to apps.size
+                ))
+                
+            } catch (e: Exception) {
+                call.application.environment.log.error("Error getting popular apps", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Failed to get popular apps")
                 )
             }
         }

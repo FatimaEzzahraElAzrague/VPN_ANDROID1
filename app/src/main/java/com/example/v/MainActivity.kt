@@ -19,7 +19,9 @@ import com.example.v.vpn.VPNManager
 import com.example.v.navigation.VPNNavigation
 import com.example.v.services.GoogleSignInService
 import com.example.v.ui.theme.VPNTheme
+import com.example.v.auth.AuthManager
 import kotlinx.coroutines.launch
+import com.example.v.data.ServersData
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInService: GoogleSignInService
@@ -40,6 +42,10 @@ class MainActivity : ComponentActivity() {
     @RequiresApi(Build.VERSION_CODES.O)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Initialize AuthManager
+        AuthManager.initialize(this)
+        
         googleSignInService = GoogleSignInService(this)
 
         setContent {
@@ -60,14 +66,22 @@ class MainActivity : ComponentActivity() {
         // Start Auto-Connect monitoring once app launches
         val repo = AutoConnectRepository(applicationContext)
         val vpnManager = VPNManager.getInstance(applicationContext)
+        
+        // Initialize VPN Manager with proxy services
+        vpnManager.initialize()
+        
+        // Get the first available server (since we removed getOptimalServer)
+        val currentServer = ServersData.servers.firstOrNull() ?: ServersData.servers[0]
+
         val autoConnectManager = AutoConnectManager(
             context = applicationContext,
             repo = repo,
             startVpnTunnel = {
                 // Use optimal server when auto-connecting
-                val optimal = com.example.v.data.ServersData.getOptimalServer()
-                if (optimal != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    vpnManager.connect(optimal)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                        vpnManager.connect(currentServer.id)
+                    }
                 }
             }
         )

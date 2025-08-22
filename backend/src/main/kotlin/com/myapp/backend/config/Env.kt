@@ -23,6 +23,7 @@ object Env {
     val otpCooldownSeconds: Long get() = getOptional("OTP_COOLDOWN_SECONDS")?.toLong() ?: 60
     val appBaseUrl: String get() = getRequired("APP_BASE_URL")
     val port: Int get() = getOptional("PORT")?.toInt() ?: 8080
+    val agentToken: String get() = getRequired("AGENT_TOKEN")
 
     fun load() {
         if (dotenv != null) return

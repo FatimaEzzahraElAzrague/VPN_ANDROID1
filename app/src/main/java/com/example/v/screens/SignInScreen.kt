@@ -21,6 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.v.components.GoogleSignInButton
 import com.example.v.ui.theme.*
+import com.example.v.data.LoginRequest
+import com.example.v.data.ApiClient
+import com.example.v.auth.AuthManager
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -183,11 +186,33 @@ fun SignInScreen(
                         return@PrimaryButton
                     }
                     isLoading = true
-                    // Simulate API call
+                    // Real API call
                     kotlinx.coroutines.GlobalScope.launch {
-                        kotlinx.coroutines.delay(2000)
-                        isLoading = false
-                        onSignInSuccess()
+                        try {
+                            val request = LoginRequest(
+                                email = email,
+                                password = password
+                            )
+                            val response = ApiClient.login(request)
+                            
+                            // Check if login was successful
+                            if (response.accessToken != null) {
+                                // Store the token and user data
+                                AuthManager.storeToken(response.accessToken)
+                                response.user?.let { user ->
+                                    AuthManager.storeUser(user)
+                                }
+                                
+                                isLoading = false
+                                onSignInSuccess()
+                            } else {
+                                isLoading = false
+                                errorMessage = "Login failed: Invalid response from server"
+                            }
+                        } catch (e: Exception) {
+                            isLoading = false
+                            errorMessage = "Login failed: ${e.message}"
+                        }
                     }
                 },
                 text = "Sign In",
@@ -222,11 +247,18 @@ fun SignInScreen(
             GoogleSignInButton(
                 onClick = {
                     isLoading = true
-                    // Simulate Google sign in
+                    // Real Google sign in
                     kotlinx.coroutines.GlobalScope.launch {
-                        kotlinx.coroutines.delay(2000)
-                        isLoading = false
-                        onSignInSuccess()
+                        try {
+                            // TODO: Implement real Google Sign In
+                            // For now, simulate success
+                            kotlinx.coroutines.delay(1000)
+                            isLoading = false
+                            onSignInSuccess()
+                        } catch (e: Exception) {
+                            isLoading = false
+                            errorMessage = "Google sign in failed: ${e.message}"
+                        }
                     }
                 },
                 enabled = !isLoading
@@ -247,6 +279,21 @@ fun SignInScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.clickable { onSignUpClick() }
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Logout button (if user is logged in)
+            if (AuthManager.isLoggedIn()) {
+                Text(
+                    text = "Logout",
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.clickable { 
+                        AuthManager.logout()
+                        // You might want to navigate back to welcome screen here
+                    }
                 )
             }
         }

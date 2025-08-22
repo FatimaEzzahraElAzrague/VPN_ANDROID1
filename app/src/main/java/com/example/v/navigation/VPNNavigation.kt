@@ -30,8 +30,9 @@ import com.example.v.screens.*
 import com.example.v.data.ServersData
 import com.example.v.config.VPNConfig
 import com.example.v.vpn.VPNManager
-import com.example.v.vpn.VPNConnectionState
+import com.example.v.data.models.VPNConnectionState
 import com.example.v.ui.theme.*
+import kotlinx.coroutines.launch
 
 @RequiresApi(Build.VERSION_CODES.O)
 @Composable
@@ -84,13 +85,13 @@ fun VPNNavigation(
             onServerSelect = { server -> 
                 selectedServer = server
                 // Connect to the selected server using VPN Manager
-                vpnManager.connect(server)
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    vpnManager.connect(server.id)
+                }
                 showServersScreen = false
             },
             onServerFavorite = { server ->
-                servers = servers.map { 
-                    if (it.id == server.id) it.copy(isFavorite = !it.isFavorite) else it 
-                }
+                // Favorite functionality removed for now
             },
             onBackClick = { showServersScreen = false }
         )
@@ -153,7 +154,7 @@ fun VPNNavigation(
              ) {
                  when (selectedTab) {
                                                       0 -> HomeScreen(
-                    currentServer = selectedServer ?: VPNConfig.defaultServer,
+                    currentServer = selectedServer ?: ServersData.servers.first(),
                     connectedServer = connectedServer,
                     onServerChange = { showServersScreen = true },
                     onNavigate = { route ->
@@ -163,7 +164,9 @@ fun VPNNavigation(
                     },
                     onDisconnect = { 
                         println("🔍 DEBUG: Disconnect called from HomeScreen")
-                        vpnManager.disconnect()
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            vpnManager.disconnect()
+                        }
                     },
                     isDarkTheme = isDarkTheme,
                     onThemeToggle = onThemeToggle,
@@ -260,43 +263,9 @@ private fun ServerItem(
                                 fontSize = 16.sp
                             )
 
-                            if (server.isOptimal == true) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            orangeColor.copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "OPTIMAL",
-                                        fontSize = 10.sp,
-                                        color = orangeColor,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
 
-                            if (server.isPremium == true) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .background(
-                                            Color(0xFFFFD700).copy(alpha = 0.2f),
-                                            RoundedCornerShape(8.dp)
-                                        )
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text(
-                                        text = "PREMIUM",
-                                        fontSize = 10.sp,
-                                        color = Color(0xFFFFD700),
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                }
-                            }
+
+
                         }
 
                         Text(

@@ -66,28 +66,18 @@ fun ServerLocationCard(
             Column(
                 modifier = Modifier.weight(1f)
             ) {
+                // Country and city info
                 Text(
-                    text = "Server Location",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Normal
+                    text = "${server.country} • ${server.city}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.7f) else Color.Black.copy(alpha = 0.7f)
                 )
-
-                Spacer(modifier = Modifier.height(4.dp))
-
+                
+                // Server details
                 Text(
-                    text = server.name,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium
-                )
-
-                Spacer(modifier = Modifier.height(2.dp))
-
-                Text(
-                    text = "Ping: ${server.ping} • Load: ${server.load}",
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    fontSize = 12.sp
+                    text = "${server.ip}:${server.port}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isSystemInDarkTheme()) Color.White.copy(alpha = 0.5f) else Color.Black.copy(alpha = 0.5f)
                 )
             }
 

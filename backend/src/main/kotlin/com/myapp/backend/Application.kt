@@ -8,6 +8,10 @@ import com.myapp.backend.routes.autoConnectRoutes
 import com.myapp.backend.routes.profileRoutes
 import com.myapp.backend.routes.killSwitchRoutes
 import com.myapp.backend.routes.vpnFeaturesRoutes
+import com.myapp.backend.routes.vpnRoutes
+import com.myapp.backend.routes.securityRoutes
+import com.myapp.backend.services.SessionService
+import kotlinx.coroutines.*
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
@@ -24,6 +28,9 @@ fun main() {
     // Load environment first
     Env.load()
 
+    // Start session cleanup task
+    startSessionCleanupTask()
+
     embeddedServer(Netty, host = "0.0.0.0", port = Env.port) {
         module()
     }.start(wait = true)
@@ -33,6 +40,22 @@ fun main() {
     println("   - Local: http://localhost:${Env.port}")
     println("   - Network: http://0.0.0.0:${Env.port}")
     println("📊 Debug endpoint: http://localhost:${Env.port}/debug/users")
+    println("🔐 Session management enabled")
+}
+
+private fun startSessionCleanupTask() {
+    CoroutineScope(Dispatchers.IO).launch {
+        while (true) {
+            try {
+                delay(300000) // Run every 5 minutes
+                SessionService.cleanupExpiredSessions()
+                val activeCount = SessionService.getActiveSessionCount()
+                println("🧹 Session cleanup completed. Active sessions: $activeCount")
+            } catch (e: Exception) {
+                println("⚠️ Session cleanup error: ${e.message}")
+            }
+        }
+    }
 }
 
 fun Application.module() {
@@ -58,6 +81,8 @@ fun Application.module() {
         killSwitchRoutes()
         vpnFeaturesRoutes()
         autoConnectRoutes()
+        vpnRoutes()
+        securityRoutes()
     }
 }
 

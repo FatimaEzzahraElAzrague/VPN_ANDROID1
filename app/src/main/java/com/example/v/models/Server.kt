@@ -6,51 +6,55 @@ import android.os.Parcelable
 data class Server(
     val id: String,
     val name: String,
-    val country: String,
-    val countryCode: String,
     val city: String,
+    val country: String,
     val flag: String,
-    val ping: Int,
-    val load: Int,
-    val isOptimal: Boolean = false,
-    val isPremium: Boolean = false,
-    var isFavorite: Boolean = false,
-    val latitude: Double,
-    val longitude: Double,
-    val wireGuardConfig: WireGuardConfig? = null
+    val ip: String,
+    val port: Int,
+    val subnet: String,
+    val serverIP: String,
+    val dnsServers: List<String>,
+    val latency: Int = 0,
+    var isConnected: Boolean = false,
+    // Essential fields only
+    val countryCode: String = country.take(2).uppercase(),
+    val ping: Int = latency,
+    val load: Int = 0
 ) : Parcelable {
     constructor(parcel: Parcel) : this(
         parcel.readString() ?: "", // id
         parcel.readString() ?: "", // name
-        parcel.readString() ?: "", // country
-        parcel.readString() ?: "", // countryCode
         parcel.readString() ?: "", // city
+        parcel.readString() ?: "", // country
         parcel.readString() ?: "", // flag
+        parcel.readString() ?: "", // ip
+        parcel.readInt(),          // port
+        parcel.readString() ?: "", // subnet
+        parcel.readString() ?: "", // serverIP
+        parcel.createStringArrayList() ?: emptyList(), // dnsServers
+        parcel.readInt(),          // latency
+        parcel.readByte() != 0.toByte(), // isConnected
+        parcel.readString() ?: "", // countryCode
         parcel.readInt(),          // ping
-        parcel.readInt(),          // load
-        parcel.readByte() != 0.toByte(), // isOptimal
-        parcel.readByte() != 0.toByte(), // isPremium
-        parcel.readByte() != 0.toByte(), // isFavorite
-        parcel.readDouble(),       // latitude
-        parcel.readDouble(),       // longitude
-        parcel.readParcelable(WireGuardConfig::class.java.classLoader, WireGuardConfig::class.java)
+        parcel.readInt()           // load
     )
 
     override fun writeToParcel(parcel: Parcel, flags: Int) {
         parcel.writeString(id)
         parcel.writeString(name)
-        parcel.writeString(country)
-        parcel.writeString(countryCode)
         parcel.writeString(city)
+        parcel.writeString(country)
         parcel.writeString(flag)
+        parcel.writeString(ip)
+        parcel.writeInt(port)
+        parcel.writeString(subnet)
+        parcel.writeString(serverIP)
+        parcel.writeStringList(dnsServers)
+        parcel.writeInt(latency)
+        parcel.writeByte(if (isConnected) 1 else 0)
+        parcel.writeString(countryCode)
         parcel.writeInt(ping)
         parcel.writeInt(load)
-        parcel.writeByte(if (isOptimal) 1 else 0)
-        parcel.writeByte(if (isPremium) 1 else 0)
-        parcel.writeByte(if (isFavorite) 1 else 0)
-        parcel.writeDouble(latitude)
-        parcel.writeDouble(longitude)
-        parcel.writeParcelable(wireGuardConfig, flags)
     }
 
     override fun describeContents(): Int {
@@ -63,53 +67,6 @@ data class Server(
         }
 
         override fun newArray(size: Int): Array<Server?> {
-            return arrayOfNulls(size)
-        }
-    }
-}
-
-data class WireGuardConfig(
-    val serverPublicKey: String,
-    val serverEndpoint: String,
-    val serverPort: Int = 51820,
-    val allowedIPs: String = "0.0.0.0/0",
-    val dns: String = "1.1.1.1, 8.8.8.8",
-    val mtu: Int = 1420,
-    val keepAlive: Int = 25,
-    val presharedKey: String? = null
-) : Parcelable {
-    constructor(parcel: Parcel) : this(
-        parcel.readString() ?: "",
-        parcel.readString() ?: "",
-        parcel.readInt(),
-        parcel.readString() ?: "0.0.0.0/0",
-        parcel.readString() ?: "1.1.1.1, 8.8.8.8",
-        parcel.readInt(),
-        parcel.readInt(),
-        parcel.readString()
-    )
-
-    override fun writeToParcel(parcel: Parcel, flags: Int) {
-        parcel.writeString(serverPublicKey)
-        parcel.writeString(serverEndpoint)
-        parcel.writeInt(serverPort)
-        parcel.writeString(allowedIPs)
-        parcel.writeString(dns)
-        parcel.writeInt(mtu)
-        parcel.writeInt(keepAlive)
-        parcel.writeString(presharedKey)
-    }
-
-    override fun describeContents(): Int {
-        return 0
-    }
-
-    companion object CREATOR : Parcelable.Creator<WireGuardConfig> {
-        override fun createFromParcel(parcel: Parcel): WireGuardConfig {
-            return WireGuardConfig(parcel)
-        }
-
-        override fun newArray(size: Int): Array<WireGuardConfig?> {
             return arrayOfNulls(size)
         }
     }

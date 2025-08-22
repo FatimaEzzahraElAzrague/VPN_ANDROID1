@@ -21,6 +21,16 @@ object JwtProvider {
             .withExpiresAt(exp)
             .sign(algorithm)
     }
+    
+    fun getUserIdFromToken(token: String): Int {
+        val verifier = JWT.require(algorithm)
+            .withIssuer(Env.jwtIssuer)
+            .withAudience(Env.jwtAudience)
+            .build()
+        
+        val decodedJWT = verifier.verify(token)
+        return decodedJWT.subject.toInt()
+    }
 
     fun algorithm(): Algorithm = algorithm
 }

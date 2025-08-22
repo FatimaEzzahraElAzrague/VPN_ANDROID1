@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.example.v.config.VPNConfig
+import com.example.v.data.autoconnect.AutoConnectRepository
 
 /**
  * Boot receiver to automatically connect VPN when device boots up
@@ -24,21 +24,19 @@ class BootReceiver : BroadcastReceiver() {
                 Log.d(TAG, "Boot completed, checking auto-connect settings")
                 
                 // Check if auto-connect is enabled in settings
-                if (VPNConfig.Settings.AUTO_CONNECT_ON_BOOT) {
-                    // Get stored VPN preferences
-                    val sharedPreferences = context.getSharedPreferences("vpn_preferences", Context.MODE_PRIVATE)
+                val repo = AutoConnectRepository(context)
+                // Since isAutoConnectEnabled() returns a Flow, just check shared preferences directly
+                val sharedPreferences = context.getSharedPreferences("vpn_preferences", Context.MODE_PRIVATE)
+                val autoConnect = sharedPreferences.getBoolean("auto_connect_enabled", true)
+                if (autoConnect) {
                     val wasConnected = sharedPreferences.getBoolean("was_connected_before_reboot", false)
-                    val autoConnect = sharedPreferences.getBoolean("auto_connect_enabled", true)
                     
                     if (wasConnected && autoConnect) {
                         Log.d(TAG, "Auto-connecting VPN after boot")
                         
                         // Start VPN service with auto-connect using default Paris server
-                        val vpnIntent = Intent(context, WireGuardVpnService::class.java).apply {
-                            action = WireGuardVpnService.ACTION_CONNECT
-                            // Use default Paris server configuration for auto-connect
-                            putExtra("server", VPNConfig.parisServer)
-                            putExtra("client_config", VPNConfig.parisClientConfig)
+                        val vpnIntent = Intent(context, RealWireGuardVPNService::class.java).apply {
+                            action = "CONNECT"
                         }
                         
                         try {

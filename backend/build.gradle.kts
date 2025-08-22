@@ -13,8 +13,14 @@ val dotenvVersion = "6.4.1"
 val bcryptVersion = "0.10.2"
 val jakartaMailVersion = "2.0.1"
 val googleApiClientVersion = "2.6.0"
+val bouncyCastleVersion = "1.77"
+val cryptographyVersion = "1.0.0"
 
 dependencies {
+    // Cryptography for WireGuard key generation
+    implementation("org.bouncycastle:bcprov-jdk18on:$bouncyCastleVersion")
+    implementation("org.bouncycastle:bcpkix-jdk18on:$bouncyCastleVersion")
+    implementation("com.google.crypto.tink:tink:$cryptographyVersion")
     // Ktor server
     implementation("io.ktor:ktor-server-core-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-netty-jvm:$ktorVersion")
@@ -23,6 +29,12 @@ dependencies {
     implementation("io.ktor:ktor-server-call-logging-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-status-pages-jvm:$ktorVersion")
     implementation("io.ktor:ktor-server-auth-jwt-jvm:$ktorVersion")
+    
+    // Ktor client (for making HTTP requests)
+    implementation("io.ktor:ktor-client-core-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-client-cio-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-client-content-negotiation-jvm:$ktorVersion")
+    implementation("io.ktor:ktor-client-serialization-jvm:$ktorVersion")
 
     // Exposed ORM + Hikari + Postgres
     implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
@@ -47,6 +59,11 @@ dependencies {
 
     // Google ID token verification
     implementation("com.google.api-client:google-api-client:$googleApiClientVersion")
+
+    // JWT Authentication
+    implementation("com.auth0:java-jwt:4.4.0")
+
+    // Database schema management - removed as it doesn't exist in this version
 
     // Logging
     implementation("ch.qos.logback:logback-classic:1.5.6")

@@ -43,7 +43,7 @@ fun ServersScreen(
                     server.city.contains(searchQuery, ignoreCase = true)
             val matchesFilter = when (selectedFilter) {
                 "All" -> true
-                "Favorites" -> server.isFavorite
+                "Favorites" -> false
                 "Africa" -> server.country in listOf("South Africa")
                 "Asia" -> server.country in listOf("Japan", "Singapore", "South Korea", "Hong Kong", "India", "Indonesia", "Malaysia", "Taiwan", "United Arab Emirates", "Israel")
                 "Europe" -> server.country in listOf("United Kingdom", "Switzerland", "France", "Germany", "Spain", "Italy")
@@ -124,7 +124,7 @@ fun ServersScreen(
         // Quick Connect Button
         Button(
             onClick = {
-                    val optimalServer = servers.find { it.isOptimal }
+                    val optimalServer = servers.first()
                     optimalServer?.let { onServerSelect(it) }
             },
                 modifier = Modifier
@@ -280,22 +280,7 @@ private fun ServerListItem(
                         modifier = Modifier.padding(top = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        if (server.isOptimal) {
-                            Badge(
-                                containerColor = Color(0xFFE53E3E).copy(alpha = 0.3f),
-                                contentColor = Color(0xFFE53E3E)
-                            ) {
-                                Text("Optimal", fontSize = 10.sp)
-                            }
-                        }
-                        if (server.isPremium) {
-                            Badge(
-                                containerColor = Color(0xFFE53E3E).copy(alpha = 0.3f),
-                                contentColor = Color(0xFFE53E3E)
-                            ) {
-                                Text("Premium", fontSize = 10.sp)
-                            }
-                        }
+
                     }
                 }
             }
@@ -320,9 +305,9 @@ private fun ServerListItem(
                     modifier = Modifier.size(32.dp)
                 ) {
                     Icon(
-                        imageVector = if (server.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        imageVector = Icons.Default.FavoriteBorder,
                         contentDescription = "Favorite",
-                        tint = if (server.isFavorite) Color.Red else getSecondaryTextColor(),
+                        tint = getSecondaryTextColor(),
                         modifier = Modifier.size(20.dp)
                     )
                 }
