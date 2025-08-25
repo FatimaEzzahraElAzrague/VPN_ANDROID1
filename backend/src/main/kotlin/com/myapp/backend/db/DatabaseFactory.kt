@@ -55,21 +55,51 @@ object DatabaseFactory {
     private fun createTables() {
         transaction {
             try {
-                // Check if google_id column exists
-                val hasGoogleIdColumn = try {
-                    exec("SELECT google_id FROM users LIMIT 1") { }
-                    true
-                } catch (e: Exception) {
-                    false
-                }
+                // Create users table
+                exec("""
+                    CREATE TABLE IF NOT EXISTS users (
+                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                        email VARCHAR(255) NOT NULL UNIQUE,
+                        password_hash VARCHAR(255),
+                        username VARCHAR(50) NOT NULL UNIQUE,
+                        full_name VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        last_login TIMESTAMP,
+                        is_active BOOLEAN DEFAULT FALSE,
+                        is_deleted BOOLEAN DEFAULT FALSE,
+                        oauth_provider VARCHAR(50),
+                        oauth_id VARCHAR(255),
+                        profile_picture_url TEXT
+                    )
+                """.trimIndent())
                 
-                if (!hasGoogleIdColumn) {
-                    println("🔄 Adding google_id column to users table...")
-                    exec("ALTER TABLE users ADD COLUMN google_id VARCHAR(255) UNIQUE")
-                    println("✅ google_id column added successfully")
-                }
+                // Create indexes
+                exec("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email) WHERE is_deleted = FALSE")
+                exec("CREATE INDEX IF NOT EXISTS idx_users_username ON users(username) WHERE is_deleted = FALSE")
+                exec("CREATE INDEX IF NOT EXISTS idx_users_oauth ON users(oauth_provider, oauth_id) WHERE is_deleted = FALSE")
                 
-                SchemaUtils.create(Users, AutoConnectTable)
+                // Create update trigger function
+                exec("""
+                    CREATE OR REPLACE FUNCTION update_updated_at_column()
+                    RETURNS TRIGGER AS $$
+                    BEGIN
+                        NEW.updated_at = CURRENT_TIMESTAMP;
+                        RETURN NEW;
+                    END;
+                    $$ language 'plpgsql'
+                """.trimIndent())
+                
+                // Create trigger
+                exec("""
+                    DROP TRIGGER IF EXISTS update_users_updated_at ON users;
+                    CREATE TRIGGER update_users_updated_at
+                        BEFORE UPDATE ON users
+                        FOR EACH ROW
+                        EXECUTE FUNCTION update_updated_at_column()
+                """.trimIndent())
+                
+                SchemaUtils.create(Users)
                 println("✅ Database tables created successfully")
             } catch (e: Exception) {
                 println("⚠️ Tables might already exist: ${e.message}")

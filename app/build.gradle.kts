@@ -88,8 +88,6 @@ android {
             useLegacyPackaging = true
         }
     }
-
-    // dexOptions removed in AGP 8.x; not needed
 }
 
 dependencies {
@@ -112,8 +110,6 @@ dependencies {
     // WireGuard-Go implementation
     // Custom WireGuard-Go implementation (no external dependencies)
 
-    // No database needed - simplified VPN app
-
     testImplementation("junit:junit:4.13.2")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
@@ -124,7 +120,7 @@ dependencies {
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
-    // Media3
+    // Media3 for video background
     implementation("androidx.media3:media3-exoplayer:1.3.1")
     implementation("androidx.media3:media3-ui:1.3.1")
 
@@ -133,18 +129,11 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-service:2.7.0")
     implementation("androidx.biometric:biometric:1.1.0")
 
-    // BouncyCastle for cryptography
+    // Cryptography and Security
     implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.78.1")
-    
-    // WireGuard crypto algorithms
     implementation("com.google.crypto.tink:tink-android:1.7.0") // ChaCha20-Poly1305
-    
-    // Gson for JSON serialization
-    implementation("com.google.code.gson:gson:2.10.1")
-
-    // VPN Dependencies - simplified approach without WireGuard library issues
-    // Using standard Android VPN APIs instead
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Networking and JSON
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
@@ -164,21 +153,6 @@ dependencies {
     // Google Sign-In
     implementation("com.google.android.gms:play-services-auth:20.7.0")
 
-    // Encryption and Security
-    implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("net.zetetic:android-database-sqlcipher:4.5.4")
-
-    // Core library desugaring for Java 9+ APIs and record desugaring support
+    // Core library desugaring
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-
-    // ML and AI Dependencies for VPN Traffic Analysis
-    implementation("org.pytorch:pytorch_android:1.13.1")
-    implementation("org.pytorch:pytorch_android_torchvision:1.13.1")
-    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.0")
-    
-    // Note: Jython removed due to compatibility issues with Android
-    // We'll implement AI analysis using pure Kotlin/Java approach
-    
-    // Alternative: Use Weka for ML model loading
-    // implementation("nz.ac.waikato.cms.weka:weka-stable:3.8.6")
 }

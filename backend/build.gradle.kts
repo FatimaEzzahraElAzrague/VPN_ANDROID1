@@ -1,23 +1,17 @@
 plugins {
-    kotlin("jvm") version "1.9.22"
-    kotlin("plugin.serialization") version "1.9.22"
+    kotlin("jvm") version "1.9.24"
+    kotlin("plugin.serialization") version "1.9.24"
     id("io.ktor.plugin") version "2.3.8"
-    id("org.flywaydb.flyway") version "10.8.1"
 }
 
 group = "com.myapp"
 version = "1.0.0"
-
-repositories {
-    mavenCentral()
-}
 
 val ktorVersion = "2.3.8"
 val exposedVersion = "0.46.0"
 val postgresVersion = "42.7.2"
 val lettuceVersion = "6.3.1.RELEASE"
 val logbackVersion = "1.4.14"
-val flywayVersion = "10.8.1"
 val hikariVersion = "5.1.0"
 
 dependencies {
@@ -42,8 +36,6 @@ dependencies {
     implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
     implementation("org.postgresql:postgresql:$postgresVersion")
     implementation("com.zaxxer:HikariCP:$hikariVersion")
-    implementation("org.flywaydb:flyway-core:$flywayVersion")
-    implementation("org.flywaydb:flyway-database-postgresql:$flywayVersion")
 
     // Redis
     implementation("io.lettuce:lettuce-core:$lettuceVersion")
@@ -62,13 +54,4 @@ kotlin {
 
 application {
     mainClass.set("com.myapp.backend.ApplicationKt")
-}
-
-// Flyway configuration
-flyway {
-    url = System.getenv("DATABASE_URL") ?: "jdbc:postgresql://localhost:5432/myapp"
-    user = System.getenv("DB_USER")
-    password = System.getenv("DB_PASSWORD")
-    baselineOnMigrate = true
-    locations = arrayOf("filesystem:src/main/resources/db/migration")
 }
