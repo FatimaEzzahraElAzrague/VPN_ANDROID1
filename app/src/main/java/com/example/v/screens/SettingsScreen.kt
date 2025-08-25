@@ -1345,20 +1345,17 @@ private fun SecurityPage(
     val context = LocalContext.current
     val vpnManager = remember { VPNManager.getInstance(context) }
     
-    // Load initial security settings
-    val (initialAdBlock, initialMalware, initialFamily) = remember { vpnManager.getSecuritySettings() }
-    
     // Security features state
-    var adBlockEnabled by remember { mutableStateOf(initialAdBlock) }
-    var malwareBlockEnabled by remember { mutableStateOf(initialMalware) }
-    var familyModeEnabled by remember { mutableStateOf(initialFamily) }
+    var adBlockEnabled by remember { mutableStateOf(false) }
+    var malwareBlockEnabled by remember { mutableStateOf(false) }
+    var familyModeEnabled by remember { mutableStateOf(false) }
     var dnsLeakProtectionEnabled by remember { mutableStateOf(true) }
 
     // Update VPN settings when security features change
     LaunchedEffect(adBlockEnabled, malwareBlockEnabled, familyModeEnabled) {
         try {
-            // Save new settings
-            vpnManager.saveSecuritySettings(
+            // Save new settings using the new VPNManager method
+            vpnManager.setFeatureFlags(
                 adBlock = adBlockEnabled,
                 antiMalware = malwareBlockEnabled,
                 familySafe = familyModeEnabled

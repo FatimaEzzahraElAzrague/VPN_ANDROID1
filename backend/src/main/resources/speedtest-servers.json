@@ -1,0 +1,30 @@
+{
+  "servers": [
+    {
+      "id": "osaka",
+      "name": "Osaka VPN Server",
+      "host": "osaka.myvpn.com",
+      "port": 443,
+      "location": "Osaka",
+      "country": "Japan",
+      "isActive": true,
+      "priority": 1
+    },
+    {
+      "id": "paris",
+      "name": "Paris VPN Server", 
+      "host": "paris.myvpn.com",
+      "port": 443,
+      "location": "Paris",
+      "country": "France",
+      "isActive": true,
+      "priority": 2
+    }
+  ],
+  "settings": {
+    "maxDownloadSizeBytes": 100000000,
+    "maxUploadSizeBytes": 100000000,
+    "rateLimitRequestsPerMinute": 10,
+    "defaultTestSizeBytes": 50000000
+  }
+}

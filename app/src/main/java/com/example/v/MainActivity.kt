@@ -22,11 +22,32 @@ import com.example.v.ui.theme.VPNTheme
 import com.example.v.auth.AuthManager
 import kotlinx.coroutines.launch
 import com.example.v.data.ServersData
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     private lateinit var googleSignInService: GoogleSignInService
     private var onGoogleSignInSuccess: (() -> Unit)? = null
     private var navigateToSignIn: (() -> Unit)? = null
+    private lateinit var vpnManager: VPNManager
+
+    // VPN permission launcher
+    private val vpnPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            Log.i("MainActivity", "✅ VPN permission granted")
+            // VPN permission granted, can now connect
+            vpnManager.setVPNPermissionCallback { granted ->
+                if (granted) {
+                    Log.i("MainActivity", "✅ VPN permission confirmed")
+                } else {
+                    Log.w("MainActivity", "⚠️ VPN permission denied")
+                }
+            }
+        } else {
+            Log.w("MainActivity", "⚠️ VPN permission denied or cancelled")
+        }
+    }
 
     private val googleSignInLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -46,6 +67,10 @@ class MainActivity : ComponentActivity() {
         // Initialize AuthManager
         AuthManager.initialize(this)
         
+        // Initialize VPN Manager
+        vpnManager = VPNManager.getInstance(this)
+        vpnManager.initialize()
+        
         googleSignInService = GoogleSignInService(this)
 
         setContent {
@@ -59,16 +84,15 @@ class MainActivity : ComponentActivity() {
                 },
                 exposeNavigateToSignIn = { navFn ->
                     navigateToSignIn = navFn
+                },
+                onVPNPermissionRequest = {
+                    requestVPNPermission()
                 }
             )
         }
 
         // Start Auto-Connect monitoring once app launches
         val repo = AutoConnectRepository(applicationContext)
-        val vpnManager = VPNManager.getInstance(applicationContext)
-        
-        // Initialize VPN Manager with proxy services
-        vpnManager.initialize()
         
         // Get the first available server (since we removed getOptimalServer)
         val currentServer = ServersData.servers.firstOrNull() ?: ServersData.servers[0]
@@ -80,12 +104,32 @@ class MainActivity : ComponentActivity() {
                 // Use optimal server when auto-connecting
                 if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
                     kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                        vpnManager.connect(currentServer.id)
+                        // Check VPN permission first
+                        val intent = vpnManager.prepareVPNPermission()
+                        if (intent != null) {
+                            vpnPermissionLauncher.launch(intent)
+                        } else {
+                            // Permission already granted, connect
+                            vpnManager.connectToVPN(currentServer.id)
+                        }
                     }
                 }
             }
         )
         autoConnectManager.start()
+    }
+
+    /**
+     * Request VPN permission
+     */
+    private fun requestVPNPermission() {
+        val intent = vpnManager.prepareVPNPermission()
+        if (intent != null) {
+            Log.i("MainActivity", "🔐 Requesting VPN permission...")
+            vpnPermissionLauncher.launch(intent)
+        } else {
+            Log.i("MainActivity", "✅ VPN permission already granted")
+        }
     }
 
     private fun handleGoogleSignInResult(data: Intent?) {
@@ -113,7 +157,8 @@ class MainActivity : ComponentActivity() {
 fun VPNApp(
     onGoogleSignInRequest: () -> Unit = {},
     onGoogleSignInSuccess: (() -> Unit) -> Unit = {},
-    exposeNavigateToSignIn: ((() -> Unit) -> Unit) = {}
+    exposeNavigateToSignIn: ((() -> Unit) -> Unit) = {},
+    onVPNPermissionRequest: () -> Unit = {}
 ) {
     var isDarkTheme by remember { mutableStateOf<Boolean?>(null) }
     var isAuthenticated by remember { mutableStateOf(false) }
@@ -127,7 +172,8 @@ fun VPNApp(
                 onThemeToggle = {
                     isDarkTheme = if (isDarkTheme == null) !systemDarkTheme else !isDarkTheme!!
                 },
-                onSignOut = { isAuthenticated = false }
+                onSignOut = { isAuthenticated = false },
+                onVPNPermissionRequest = onVPNPermissionRequest
             )
         } else {
             AuthNavigation(

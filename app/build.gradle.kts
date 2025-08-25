@@ -7,14 +7,6 @@ plugins {
 android {
     namespace = "com.example.v"
     compileSdk = 36
-    
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
-        }
-    }
 
     defaultConfig {
         applicationId = "com.example.v"
@@ -27,6 +19,19 @@ android {
         vectorDrawables {
             useSupportLibrary = true
         }
+        
+        // Native build configuration
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86", "x86_64")
+        }
+        
+        // CMake configuration
+        externalNativeBuild {
+            cmake {
+                cppFlags += "-std=c++17"
+                arguments += "-DANDROID_STL=c++_shared"
+            }
+        }
     }
 
     buildTypes {
@@ -38,6 +43,15 @@ android {
             )
         }
     }
+    
+    // Native build configuration
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+    
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -68,6 +82,11 @@ android {
             excludes += "META-INF/INDEX.LIST"
             excludes += "META-INF/io.netty.versions.properties"
         }
+        
+        // Include native libraries
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     // dexOptions removed in AGP 8.x; not needed
@@ -89,6 +108,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.7.7")
     implementation("androidx.compose.runtime:runtime-livedata")
+
+    // WireGuard-Go implementation
+    // Custom WireGuard-Go implementation (no external dependencies)
 
     // No database needed - simplified VPN app
 

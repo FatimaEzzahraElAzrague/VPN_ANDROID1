@@ -58,7 +58,8 @@ fun HomeScreen(
     onDisconnect: () -> Unit,
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    vpnManager: com.example.v.vpn.VPNManager
+    vpnManager: com.example.v.vpn.VPNManager,
+    onVPNPermissionRequest: () -> Unit
 ) {
     // Debug logging for VPNManager
     LaunchedEffect(vpnManager) {
@@ -84,26 +85,26 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     
-    // Launcher for VPN permission dialog
-    val vpnPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { _: ActivityResult ->
-        val granted = vpnManager.hasVpnPermission()
-        println("🔍 DEBUG: VPN permission result received. granted=$granted")
-        if (granted) {
-            println("🔍 DEBUG: Permission granted via dialog. Connecting now...")
-            // Launch coroutine for suspend function
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                vpnManager.connect(currentServer.id)
+    // Handle VPN connection
+    fun handleVPNConnection() {
+        if (!isConnected) {
+            // Check VPN permission first
+            val intent = vpnManager.prepareVPNPermission()
+            if (intent != null) {
+                // Request VPN permission
+                onVPNPermissionRequest()
+            } else {
+                // Permission already granted, connect
+                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                    vpnManager.connectToVPN(selectedServer.id)
+                }
             }
         } else {
-            println("🔍 DEBUG: Permission denied by user.")
+            // Disconnect
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                vpnManager.disconnect()
+            }
         }
-    }
-    
-    // Update connection state when connectedServer changes
-    LaunchedEffect(connectedServer) {
-        isConnected = connectedServer != null
     }
 
     // Session duration timer
@@ -150,65 +151,6 @@ fun HomeScreen(
                     println("✅ VPN IP VERIFICATION PASSED: $originalIP → $ip")
                 } else {
                     println("❌ VPN IP VERIFICATION FAILED: IP unchanged ($ip)")
-                }
-            }
-        }
-    }
-
-    // Handle VPN connection
-    fun handleConnect() {
-        println("🔍 DEBUG: handleConnect function called")
-        println("🔍 DEBUG: Current state: $vpnConnectionState")
-        
-        if (vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTED) {
-            // Disconnect
-            println("🔍 DEBUG: Disconnecting VPN")
-            onDisconnect()
-        } else if (vpnConnectionState == com.example.v.data.models.VPNConnectionState.CONNECTING) {
-            println("🔍 DEBUG: VPN is already connecting...")
-            return
-        } else {
-            // Debug logging
-            println("🔍 DEBUG: handleConnect called")
-            println("🔍 DEBUG: vpnManager = $vpnManager")
-            println("🔍 DEBUG: currentServer = $currentServer")
-            println("🔍 DEBUG: currentServer.id = ${currentServer.id}")
-            println("🔍 DEBUG: currentServer.city = ${currentServer.city}")
-            
-            println("🔍 DEBUG: ===============================")
-            println("🔍 DEBUG: CONNECT BUTTON CLICKED!")
-            println("🔍 DEBUG: ===============================")
-            
-            // Always check VPN permission first - even if we think we have it
-            val hasPermission = vpnManager.hasVpnPermission()
-            println("🔍 DEBUG: hasVpnPermission = $hasPermission")
-            
-            if (hasPermission) {
-                // Connect directly to current server
-                println("🔍 DEBUG: ✅ Has permission, connecting to ${currentServer.city}")
-                println("🔍 DEBUG: Calling vpnManager.connect() now...")
-                // Launch coroutine for suspend function
-                kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                    vpnManager.connect(currentServer.id)
-                }
-                println("🔍 DEBUG: vpnManager.connect() call completed")
-            } else {
-                // Request VPN permission
-                println("🔍 DEBUG: ❌ No permission, requesting VPN permission")
-                val permissionIntent = vpnManager.getVpnPermissionIntent()
-                println("🔍 DEBUG: permissionIntent = $permissionIntent")
-                
-                if (permissionIntent != null) {
-                    println("🔍 DEBUG: Launching VPN permission dialog via Activity Result API...")
-                    vpnPermissionLauncher.launch(permissionIntent)
-                } else {
-                    println("🔍 DEBUG: ❌ permissionIntent is null - this should not happen!")
-                    // Try to connect anyway - permission might already be granted
-                    println("🔍 DEBUG: Attempting to connect anyway...")
-                    // Launch coroutine for suspend function
-                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                        vpnManager.connect(currentServer.id)
-                    }
                 }
             }
         }
@@ -269,9 +211,9 @@ fun HomeScreen(
                             println("🔍 DEBUG: Connect button clicked!")
                             println("🔍 DEBUG: Button state - isConnected: $isConnected")
                             println("🔍 DEBUG: Button state - vpnConnectionState: $vpnConnectionState")
-                            println("🔍 DEBUG: About to call handleConnect()")
-                            handleConnect() 
-                            println("🔍 DEBUG: handleConnect() called successfully")
+                            println("🔍 DEBUG: About to call handleVPNConnection()")
+                            handleVPNConnection() 
+                            println("🔍 DEBUG: handleVPNConnection() called successfully")
                         },
                         modifier = Modifier.size(200.dp)
                     )
@@ -294,7 +236,7 @@ fun HomeScreen(
                         ConnectionDetailsCard(
                             server = connectedServer,
                             sessionDuration = sessionDuration,
-                            localTunnelIp = vpnManager.getLocalTunnelIpv4(),
+                            localTunnelIp = connectedServer.serverIP,
                             modifier = Modifier.fillMaxWidth()
                         )
                         

@@ -36,7 +36,8 @@ object ServerConfig {
     )
 
     // Constants
-    const val AGENT_TOKEN = "vpn-agent-secret-token-2024"
+    // JWT authentication is used instead of hardcoded tokens
+    // const val AGENT_TOKEN = "vpn-agent-secret-token-2024" // REMOVED - Security risk
     
     // DNS servers for Paris and Osaka servers only (internal VPN DNS)
     object FilteringDNS {

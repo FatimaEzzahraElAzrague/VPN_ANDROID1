@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import com.example.v.models.Server
 import com.example.v.screens.*
+
 import com.example.v.data.ServersData
 import com.example.v.config.VPNConfig
 import com.example.v.vpn.VPNManager
@@ -39,7 +40,8 @@ import kotlinx.coroutines.launch
 fun VPNNavigation(
     isDarkTheme: Boolean,
     onThemeToggle: () -> Unit,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    onVPNPermissionRequest: () -> Unit
 ) {
     var selectedTab by remember { mutableStateOf(0) }
     var selectedServer by remember { mutableStateOf<Server?>(null) }
@@ -86,14 +88,15 @@ fun VPNNavigation(
                 selectedServer = server
                 // Connect to the selected server using VPN Manager
                 kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                    vpnManager.connect(server.id)
+                    vpnManager.connectToVPN(server.id)
                 }
                 showServersScreen = false
             },
             onServerFavorite = { server ->
                 // Favorite functionality removed for now
             },
-            onBackClick = { showServersScreen = false }
+            onBackClick = { showServersScreen = false },
+            onVPNPermissionRequest = onVPNPermissionRequest
         )
     } else {
         Scaffold(
@@ -172,7 +175,8 @@ fun VPNNavigation(
                     onThemeToggle = onThemeToggle,
                     vpnManager = vpnManager.also { 
                         println("🔍 DEBUG: Passing VPNManager to HomeScreen: $it")
-                    }
+                    },
+                    onVPNPermissionRequest = onVPNPermissionRequest
                 )
                      1 -> AIAnalyzerScreen(
                          isDarkTheme = isDarkTheme,
@@ -180,8 +184,7 @@ fun VPNNavigation(
                      )
                      2 -> SettingsScreen(
                          isDarkTheme = isDarkTheme,
-                         onThemeToggle = onThemeToggle,
-                         onSignOut = onSignOut
+                         onThemeToggle = onSignOut
                      )
                  }
              }

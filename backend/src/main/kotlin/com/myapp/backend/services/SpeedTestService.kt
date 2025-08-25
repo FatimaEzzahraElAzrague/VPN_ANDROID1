@@ -1,17 +1,20 @@
 package com.myapp.backend.services
 
 import com.myapp.backend.models.*
+import com.myapp.backend.repositories.SpeedTestRepository
+import org.slf4j.LoggerFactory
 import java.time.LocalDateTime
-import java.util.*
+import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.min
 
 /**
- * Speed Test Service
- * Handles speed test results, analytics, and server management on the backend
+ * Production-ready Speed Test Service
+ * Handles speed test operations, rate limiting, and data management
  */
 class SpeedTestService {
     
     companion object {
-        private const val TAG = "SpeedTestService"
+        private val logger = LoggerFactory.getLogger(SpeedTestService::class.java)
         
         @Volatile
         private var INSTANCE: SpeedTestService? = null
@@ -23,231 +26,175 @@ class SpeedTestService {
         }
     }
     
-    // In-memory storage (in production, this would be database)
-    private val speedTestResults = mutableMapOf<String, MutableList<SpeedTestResult>>()
-    private val speedTestConfigs = mutableMapOf<String, SpeedTestConfig>()
-    private val speedTestAnalytics = mutableMapOf<String, SpeedTestAnalytics>()
-    private val speedTestServers = mutableListOf<SpeedTestServer>()
+    private val repository = SpeedTestRepository()
+    
+    // Rate limiting for download/upload endpoints
+    private val downloadRequests = AtomicLong(0)
+    private val uploadRequests = AtomicLong(0)
+    private val lastResetTime = AtomicLong(System.currentTimeMillis())
+    
+    private val MAX_REQUESTS_PER_MINUTE = 10L
+    private val RATE_LIMIT_WINDOW_MS = 60_000L // 1 minute
     
     init {
-        // Initialize default speed test servers
-        initializeDefaultServers()
+        // Initialize default servers including Osaka and Paris
+        repository.initializeDefaultServers()
+        logger.info("SpeedTestService initialized with default servers including Osaka and Paris")
     }
     
     /**
-     * Save speed test result
+     * Process speed test result (no storage)
      */
-    fun saveSpeedTestResult(
+    fun processSpeedTestResult(
         userId: String,
+        serverId: String,
         pingMs: Long,
         downloadMbps: Double,
-        uploadMbps: Double,
-        jitterMs: Long? = null,
-        testServer: String,
-        deviceInfo: DeviceInfo? = null,
-        networkType: String? = null
-    ): SpeedTestResult {
-        val result = SpeedTestResult(
-            id = UUID.randomUUID().toString(),
-            userId = userId,
-            pingMs = pingMs,
-            downloadMbps = downloadMbps,
-            uploadMbps = uploadMbps,
-            jitterMs = jitterMs,
-            testServer = testServer,
-            deviceInfo = deviceInfo,
-            networkType = networkType,
-            timestamp = LocalDateTime.now().toString()
+        uploadMbps: Double
+    ): SpeedTestResponse {
+        logger.info("Processing speed test result for user: $userId, server: $serverId")
+        
+        // Just log the result, no storage
+        logger.info("Speed test - Ping: ${pingMs}ms, Download: ${downloadMbps}Mbps, Upload: ${uploadMbps}Mbps")
+        
+        return SpeedTestResponse(
+            success = true,
+            message = "Speed test completed successfully"
         )
-        
-        // Store result
-        if (!speedTestResults.containsKey(userId)) {
-            speedTestResults[userId] = mutableListOf()
-        }
-        speedTestResults[userId]!!.add(result)
-        
-        // Update analytics
-        updateAnalytics(userId, result)
-        
-        return result
     }
     
     /**
      * Get speed test configuration for a user
      */
-    fun getSpeedTestConfig(userId: String): SpeedTestConfig {
-        return speedTestConfigs[userId] ?: createDefaultConfig(userId)
-    }
-    
-    /**
-     * Update speed test configuration for a user
-     */
-    fun updateSpeedTestConfig(userId: String, request: SpeedTestConfigRequest): SpeedTestConfig {
-        val currentConfig = getSpeedTestConfig(userId)
+    fun getSpeedTestConfiguration(userId: String): SpeedTestConfigResponse {
+        logger.debug("Getting speed test configuration for user: $userId")
         
-        val updatedConfig = currentConfig.copy(
-            preferredServer = request.preferredServer ?: currentConfig.preferredServer,
-            uploadSizeBytes = request.uploadSizeBytes ?: currentConfig.uploadSizeBytes,
-            autoTestEnabled = request.autoTestEnabled ?: currentConfig.autoTestEnabled,
-            testIntervalMinutes = request.testIntervalMinutes ?: currentConfig.testIntervalMinutes,
-            saveResults = request.saveResults ?: currentConfig.saveResults,
-            updatedAt = LocalDateTime.now().toString()
+        val config = SpeedTestConfig(userId = userId)
+        val servers = repository.getAvailableServers()
+        
+        return SpeedTestConfigResponse(
+            config = config,
+            availableServers = servers
         )
-        
-        speedTestConfigs[userId] = updatedConfig
-        return updatedConfig
     }
     
-    /**
-     * Get speed test analytics for a user
-     */
-    fun getSpeedTestAnalytics(userId: String, period: AnalyticsPeriod = AnalyticsPeriod.DAY): SpeedTestAnalytics {
-        return speedTestAnalytics[userId] ?: SpeedTestAnalytics(userId = userId, period = period)
-    }
-    
-    /**
-     * Get recent speed test results for a user
-     */
-    fun getRecentSpeedTestResults(userId: String, limit: Int = 10): List<SpeedTestResult> {
-        return speedTestResults[userId]?.takeLast(limit)?.reversed() ?: emptyList()
-    }
+
     
     /**
      * Get available speed test servers
      */
     fun getAvailableServers(): List<SpeedTestServer> {
-        return speedTestServers.filter { it.isActive }.sortedBy { it.priority }
+        logger.debug("Getting available speed test servers")
+        return repository.getAvailableServers()
     }
     
     /**
-     * Get speed test configuration with servers and analytics
+     * Get server by ID
      */
-    fun getSpeedTestConfiguration(userId: String): SpeedTestConfigResponse {
-        val config = getSpeedTestConfig(userId)
-        val servers = getAvailableServers()
-        val analytics = getSpeedTestAnalytics(userId)
+    fun getServerById(serverId: String): SpeedTestServer? {
+        logger.debug("Getting server by ID: $serverId")
+        return repository.getServerById(serverId)
+    }
+    
+    /**
+     * Check rate limit for download endpoint
+     */
+    fun checkDownloadRateLimit(): Boolean {
+        return checkRateLimit(downloadRequests, "download")
+    }
+    
+    /**
+     * Check rate limit for upload endpoint
+     */
+    fun checkUploadRateLimit(): Boolean {
+        return checkRateLimit(uploadRequests, "upload")
+    }
+    
+    /**
+     * Increment download request counter
+     */
+    fun incrementDownloadRequests() {
+        downloadRequests.incrementAndGet()
+    }
+    
+    /**
+     * Increment upload request counter
+     */
+    fun incrementUploadRequests() {
+        uploadRequests.incrementAndGet()
+    }
+    
+    /**
+     * Generate random data for download testing
+     */
+    fun generateRandomData(sizeBytes: Long): ByteArray {
+        val actualSize = min(sizeBytes, MAX_DOWNLOAD_SIZE)
+        logger.debug("Generating random data: $actualSize bytes")
         
-        return SpeedTestConfigResponse(
-            config = config,
-            availableServers = servers,
-            analytics = analytics
+        return ByteArray(actualSize.toInt()).apply {
+            java.util.Random().nextBytes(this)
+        }
+    }
+    
+    /**
+     * Process upload and calculate speed
+     */
+    fun processUpload(data: ByteArray, uploadTimeMs: Long): SpeedTestUploadResponse {
+        val sizeBytes = data.size.toLong()
+        val uploadSpeedMbps = if (uploadTimeMs > 0) {
+            (sizeBytes * 8.0) / (uploadTimeMs * 1_000_000.0) // Convert to Mbps
+        } else 0.0
+        
+        logger.info("Upload processed: $sizeBytes bytes in ${uploadTimeMs}ms, speed: ${uploadSpeedMbps}Mbps")
+        
+        return SpeedTestUploadResponse(
+            success = true,
+            message = "Upload processed successfully",
+            sizeBytes = sizeBytes,
+            uploadTimeMs = uploadTimeMs,
+            uploadSpeedMbps = uploadSpeedMbps
         )
     }
+    
+
     
     /**
      * Get speed test statistics for admin dashboard
      */
     fun getSpeedTestStatistics(): Map<String, Any> {
-        val totalUsers = speedTestConfigs.size
-        val totalTests = speedTestResults.values.sumOf { it.size }
-        val totalResults = speedTestResults.values.flatten()
+        logger.debug("Getting speed test statistics")
         
-        val averagePing = if (totalResults.isNotEmpty()) {
-            totalResults.map { it.pingMs }.average()
-        } else 0.0
-        
-        val averageDownload = if (totalResults.isNotEmpty()) {
-            totalResults.map { it.downloadMbps }.average()
-        } else 0.0
-        
-        val averageUpload = if (totalResults.isNotEmpty()) {
-            totalResults.map { it.uploadMbps }.average()
-        } else 0.0
-        
+        // This would typically query the database for aggregated stats
+        // For now, return basic info
         return mapOf(
-            "totalUsers" to totalUsers,
-            "totalTests" to totalTests,
-            "averagePingMs" to averagePing,
-            "averageDownloadMbps" to averageDownload,
-            "averageUploadMbps" to averageUpload,
-            "activeServers" to speedTestServers.count { it.isActive }
+            "totalServers" to repository.getAvailableServers().size,
+            "lastCleanup" to LocalDateTime.now().toString(),
+            "rateLimitEnabled" to true,
+            "maxRequestsPerMinute" to MAX_REQUESTS_PER_MINUTE
         )
     }
     
-    /**
-     * Create default speed test configuration for a user
-     */
-    private fun createDefaultConfig(userId: String): SpeedTestConfig {
-        val defaultConfig = SpeedTestConfig(userId = userId)
-        speedTestConfigs[userId] = defaultConfig
-        return defaultConfig
-    }
-    
-    /**
-     * Initialize default speed test servers
-     */
-    private fun initializeDefaultServers() {
-        val defaultServers = listOf(
-            SpeedTestServer(
-                id = "cloudflare-1",
-                name = "Cloudflare Speed Test",
-                url = "https://speed.cloudflare.com/__down",
-                location = "Global",
-                country = "Global",
-                isActive = true,
-                priority = 1
-            ),
-            SpeedTestServer(
-                id = "httpbin-1",
-                name = "HTTPBin Test Server",
-                url = "https://httpbin.org/get",
-                location = "Global",
-                country = "Global",
-                isActive = true,
-                priority = 2
-            ),
-            SpeedTestServer(
-                id = "fastly-1",
-                name = "Fastly CDN",
-                url = "https://www.fastly.com/",
-                location = "Global",
-                country = "Global",
-                isActive = true,
-                priority = 3
-            )
-        )
+    private fun checkRateLimit(counter: AtomicLong, endpoint: String): Boolean {
+        val currentTime = System.currentTimeMillis()
+        val lastReset = lastResetTime.get()
         
-        speedTestServers.addAll(defaultServers)
-    }
-    
-    /**
-     * Update analytics based on new result
-     */
-    private fun updateAnalytics(userId: String, result: SpeedTestResult) {
-        val currentAnalytics = speedTestAnalytics[userId] ?: SpeedTestAnalytics(userId = userId)
-        val userResults = speedTestResults[userId] ?: listOf(result)
-        
-        val totalTests = userResults.size
-        val averagePingMs = userResults.map { it.pingMs }.average()
-        val averageDownloadMbps = userResults.map { it.downloadMbps }.average()
-        val averageUploadMbps = userResults.map { it.uploadMbps }.average()
-        val bestPingMs = userResults.minOfOrNull { it.pingMs }
-        val bestDownloadMbps = userResults.maxOfOrNull { it.downloadMbps }
-        val bestUploadMbps = userResults.maxOfOrNull { it.uploadMbps }
-        val lastTestDate = result.timestamp
-        
-        val updatedAnalytics = currentAnalytics.copy(
-            totalTests = totalTests,
-            averagePingMs = averagePingMs,
-            averageDownloadMbps = averageDownloadMbps,
-            averageUploadMbps = averageUploadMbps,
-            bestPingMs = bestPingMs,
-            bestDownloadMbps = bestDownloadMbps,
-            bestUploadMbps = bestUploadMbps,
-            lastTestDate = lastTestDate
-        )
-        
-        speedTestAnalytics[userId] = updatedAnalytics
-    }
-    
-    /**
-     * Clean up old results (keep only last 100 results per user)
-     */
-    fun cleanupOldResults() {
-        speedTestResults.forEach { (userId, results) ->
-            if (results.size > 100) {
-                speedTestResults[userId] = results.takeLast(100).toMutableList()
-            }
+        // Reset counter if window has passed
+        if (currentTime - lastReset > RATE_LIMIT_WINDOW_MS) {
+            counter.set(0)
+            lastResetTime.set(currentTime)
         }
+        
+        val currentCount = counter.get()
+        val allowed = currentCount < MAX_REQUESTS_PER_MINUTE
+        
+        if (!allowed) {
+            logger.warn("Rate limit exceeded for $endpoint endpoint: $currentCount requests")
+        }
+        
+        return allowed
+    }
+    
+    companion object {
+        private const val MAX_DOWNLOAD_SIZE = 100L * 1024L * 1024L // 100MB
     }
 }

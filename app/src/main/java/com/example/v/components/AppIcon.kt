@@ -1,44 +1,53 @@
 package com.example.v.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Apps
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.drawable.toBitmap
-import com.example.v.ui.theme.getSecondaryTextColor
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.painter.BitmapPainter
+import androidx.compose.ui.graphics.painter.Painter
+import android.graphics.Bitmap
+import android.graphics.Canvas
 
 @Composable
 fun AppIcon(
-    drawable: android.graphics.drawable.Drawable?,
+    drawable: Drawable?,
     modifier: Modifier = Modifier,
-    tint: Color = getSecondaryTextColor()
+    size: Int = 48,
+    tint: androidx.compose.ui.graphics.Color? = null
 ) {
     if (drawable != null) {
-        val bitmap = drawable.toBitmap()
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = null,
-                modifier = modifier
-                    .size(24.dp)
-                    .clip(RoundedCornerShape(4.dp))
-            )
-    } else {
-        // Fallback to default app icon
-        Icon(
-            imageVector = Icons.Default.Apps,
-            contentDescription = null,
-            modifier = modifier.size(24.dp),
-            tint = tint
+        val painter = drawable.toPainter()
+        Image(
+            painter = painter,
+            contentDescription = "App Icon",
+            modifier = modifier.size(size.dp),
+            colorFilter = tint?.let { androidx.compose.ui.graphics.ColorFilter.tint(it) }
         )
     }
-} 
+}
+
+fun Drawable.toPainter(): Painter {
+    return if (this is BitmapDrawable) {
+        BitmapPainter(this.bitmap.asImageBitmap())
+    } else {
+        // Convert any drawable to bitmap
+        val bitmap = Bitmap.createBitmap(
+            this.intrinsicWidth,
+            this.intrinsicHeight,
+            Bitmap.Config.ARGB_8888
+        )
+        val canvas = Canvas(bitmap)
+        this.setBounds(0, 0, canvas.width, canvas.height)
+        this.draw(canvas)
+        BitmapPainter(bitmap.asImageBitmap())
+    }
+}

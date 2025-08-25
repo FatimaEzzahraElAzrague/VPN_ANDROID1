@@ -3,16 +3,20 @@ package com.myapp.backend.routes
 import com.myapp.backend.models.*
 import com.myapp.backend.services.SpeedTestService
 import com.myapp.backend.services.SplitTunnelingService
+import com.myapp.backend.config.Jwt
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.ktor.utils.io.*
+import org.slf4j.LoggerFactory
 import java.util.*
 
 fun Route.vpnFeaturesRoutes() {
     val speedTestService = SpeedTestService.getInstance()
     val splitTunnelingService = SplitTunnelingService.getInstance()
+    val logger = LoggerFactory.getLogger("VPNFeaturesRoutes")
     
     // Speed Test Routes
     route("/speedtest") {
@@ -20,19 +24,47 @@ fun Route.vpnFeaturesRoutes() {
         /**
          * GET /speedtest/config/{userId}
          * Get speed test configuration for a user
+         * Requires JWT authentication
          */
         get("/config/{userId}") {
             try {
+                // Extract and validate JWT token
+                val token = call.request.header("Authorization")?.removePrefix("Bearer ")
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Missing authorization token")
+                    )
+                
                 val userId = call.parameters["userId"] ?: return@get call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf("error" to "User ID is required")
                 )
                 
+                // Validate JWT and extract user ID
+                val tokenUserId = try {
+                    Jwt.getUserIdFromToken(token)
+                } catch (e: Exception) {
+                    logger.warn("Invalid JWT token: ${e.message}")
+                    return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid authorization token")
+                    )
+                }
+                
+                // Ensure user can only access their own data
+                if (tokenUserId.toString() != userId) {
+                    logger.warn("User $tokenUserId attempted to access data for user $userId")
+                    return@get call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Access denied")
+                    )
+                }
+                
                 val config = speedTestService.getSpeedTestConfiguration(userId)
                 call.respond(HttpStatusCode.OK, config)
                 
             } catch (e: Exception) {
-                call.application.environment.log.error("Error getting speed test config", e)
+                logger.error("Error getting speed test config", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to "Failed to get speed test configuration")
@@ -41,136 +73,87 @@ fun Route.vpnFeaturesRoutes() {
         }
         
         /**
-         * PUT /speedtest/config/{userId}
-         * Update speed test settings for a user
-         */
-        put("/config/{userId}") {
-            try {
-                val userId = call.parameters["userId"] ?: return@put call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "User ID is required")
-                )
-                
-                val request = call.receive<SpeedTestConfigRequest>()
-                val updatedConfig = speedTestService.updateSpeedTestConfig(userId, request)
-                
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "success" to true,
-                    "message" to "Speed test settings updated successfully",
-                    "config" to updatedConfig
-                ))
-                
-            } catch (e: Exception) {
-                call.application.environment.log.error("Error updating speed test config", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    mapOf("error" to "Failed to update speed test configuration")
-                )
-            }
-        }
-        
-        /**
          * POST /speedtest/result/{userId}
-         * Save speed test result
+         * Process speed test result (no storage)
+         * Requires JWT authentication
          */
         post("/result/{userId}") {
             try {
+                // Extract and validate JWT token
+                val token = call.request.header("Authorization")?.removePrefix("Bearer ")
+                    ?: return@post call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Missing authorization token")
+                    )
+                
                 val userId = call.parameters["userId"] ?: return@post call.respond(
                     HttpStatusCode.BadRequest,
                     mapOf("error" to "User ID is required")
                 )
                 
-                val request = call.receive<Map<String, Any>>()
-                
-                val result = speedTestService.saveSpeedTestResult(
-                    userId = userId,
-                    pingMs = (request["pingMs"] as? Number)?.toLong() ?: 0L,
-                    downloadMbps = (request["downloadMbps"] as? Number)?.toDouble() ?: 0.0,
-                    uploadMbps = (request["uploadMbps"] as? Number)?.toDouble() ?: 0.0,
-                    jitterMs = (request["jitterMs"] as? Number)?.toLong(),
-                    testServer = request["testServer"] as? String ?: "",
-                    deviceInfo = null, // Parse device info if needed
-                    networkType = request["networkType"] as? String
-                )
-                
-                call.respond(HttpStatusCode.OK, SpeedTestResponse(
-                    success = true,
-                    message = "Speed test result saved successfully",
-                    result = result
-                ))
-                
-            } catch (e: Exception) {
-                call.application.environment.log.error("Error saving speed test result", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    SpeedTestResponse(
-                        success = false,
-                        message = "Failed to save speed test result",
-                        error = e.message
+                // Validate JWT and extract user ID
+                val tokenUserId = try {
+                    Jwt.getUserIdFromToken(token)
+                } catch (e: Exception) {
+                    logger.warn("Invalid JWT token: ${e.message}")
+                    return@post call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid authorization token")
                     )
-                )
-            }
-        }
-        
-        /**
-         * GET /speedtest/results/{userId}
-         * Get recent speed test results for a user
-         */
-        get("/results/{userId}") {
-            try {
-                val userId = call.parameters["userId"] ?: return@get call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "User ID is required")
-                )
-                
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
-                val results = speedTestService.getRecentSpeedTestResults(userId, limit)
-                
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "success" to true,
-                    "results" to results,
-                    "count" to results.size
-                ))
-                
-            } catch (e: Exception) {
-                call.application.environment.log.error("Error getting speed test results", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    mapOf("error" to "Failed to get speed test results")
-                )
-            }
-        }
-        
-        /**
-         * GET /speedtest/analytics/{userId}
-         * Get speed test analytics for a user
-         */
-        get("/analytics/{userId}") {
-            try {
-                val userId = call.parameters["userId"] ?: return@get call.respond(
-                    HttpStatusCode.BadRequest,
-                    mapOf("error" to "User ID is required")
-                )
-                
-                val periodStr = call.request.queryParameters["period"] ?: "DAY"
-                val period = try {
-                    AnalyticsPeriod.valueOf(periodStr.uppercase())
-                } catch (e: IllegalArgumentException) {
-                    AnalyticsPeriod.DAY
                 }
                 
-                val analytics = speedTestService.getSpeedTestAnalytics(userId, period)
+                // Ensure user can only access their own data
+                if (tokenUserId.toString() != userId) {
+                    logger.warn("User $tokenUserId attempted to access data for user $userId")
+                    return@post call.respond(
+                        HttpStatusCode.Forbidden,
+                        mapOf("error" to "Access denied")
+                    )
+                }
                 
-                call.respond(HttpStatusCode.OK, mapOf(
-                    "success" to true,
-                    "analytics" to analytics
-                ))
+                val request = call.receive<SpeedTestRequest>()
+                
+                val response = speedTestService.processSpeedTestResult(
+                    userId = userId,
+                    serverId = request.serverId,
+                    pingMs = request.pingMs,
+                    downloadMbps = request.downloadMbps,
+                    uploadMbps = request.uploadMbps
+                )
+                
+                call.respond(HttpStatusCode.OK, response)
                 
             } catch (e: Exception) {
-                call.application.environment.log.error("Error getting speed test analytics", e)
+                logger.error("Error processing speed test result", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
-                    mapOf("error" to "Failed to get speed test analytics")
+                    mapOf("error" to "Failed to process speed test result")
+                )
+            }
+        }
+        
+
+        
+
+        
+        /**
+         * GET /speedtest/ping
+         * Lightweight ping endpoint for latency measurement
+         * Public endpoint (no authentication required)
+         */
+        get("/ping") {
+            try {
+                // Simple ping response - just return success immediately
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "success" to true,
+                    "message" to "pong",
+                    "timestamp" to System.currentTimeMillis()
+                ))
+            } catch (e: Exception) {
+                logger.error("Error in ping endpoint", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Ping failed")
                 )
             }
         }
@@ -178,18 +161,17 @@ fun Route.vpnFeaturesRoutes() {
         /**
          * GET /speedtest/servers
          * Get available speed test servers
+         * Public endpoint (no authentication required)
          */
         get("/servers") {
             try {
                 val servers = speedTestService.getAvailableServers()
-                
                 call.respond(HttpStatusCode.OK, mapOf(
                     "success" to true,
                     "servers" to servers
                 ))
-                
             } catch (e: Exception) {
-                call.application.environment.log.error("Error getting speed test servers", e)
+                logger.error("Error getting speed test servers", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to "Failed to get speed test servers")
@@ -198,11 +180,117 @@ fun Route.vpnFeaturesRoutes() {
         }
         
         /**
+         * GET /speedtest/download
+         * Streams random data for download testing
+         * Rate limited to prevent abuse
+         */
+        get("/download") {
+            try {
+                // Check rate limit
+                if (!speedTestService.checkDownloadRateLimit()) {
+                    call.respond(
+                        HttpStatusCode.TooManyRequests,
+                        mapOf("error" to "Rate limit exceeded. Try again later.")
+                    )
+                    return@get
+                }
+                
+                // Increment request counter
+                speedTestService.incrementDownloadRequests()
+                
+                val sizeParam = call.request.queryParameters["size"]?.toLongOrNull() ?: 50_000_000L // 50MB default
+                val size = minOf(sizeParam, 100_000_000L) // Max 100MB
+                
+                logger.info("Download request: ${size} bytes")
+                
+                // Generate random data
+                val data = speedTestService.generateRandomData(size)
+                
+                // Stream the response
+                call.respondOutputStream(
+                    contentType = ContentType.Application.OctetStream,
+                    status = HttpStatusCode.OK
+                ) { output ->
+                    output.write(data)
+                    output.flush()
+                }
+                
+            } catch (e: Exception) {
+                logger.error("Error in download endpoint", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Download failed")
+                )
+            }
+        }
+        
+        /**
+         * POST /speedtest/upload
+         * Accepts binary upload for speed testing
+         * Rate limited to prevent abuse
+         */
+        post("/upload") {
+            try {
+                // Check rate limit
+                if (!speedTestService.checkUploadRateLimit()) {
+                    call.respond(
+                        HttpStatusCode.TooManyRequests,
+                        mapOf("error" to "Rate limit exceeded. Try again later.")
+                    )
+                    return@post
+                }
+                
+                // Increment request counter
+                speedTestService.incrementUploadRequests()
+                
+                val startTime = System.currentTimeMillis()
+                val channel = call.receiveChannel()
+                
+                // Read all data
+                val data = channel.toByteArray()
+                val uploadTime = System.currentTimeMillis() - startTime
+                
+                logger.info("Upload request: ${data.size} bytes in ${uploadTime}ms")
+                
+                // Process upload and calculate speed
+                val response = speedTestService.processUpload(data, uploadTime)
+                
+                call.respond(HttpStatusCode.OK, response)
+                
+            } catch (e: Exception) {
+                logger.error("Error in upload endpoint", e)
+                call.respond(
+                    HttpStatusCode.InternalServerError,
+                    mapOf("error" to "Upload failed")
+                )
+            }
+        }
+        
+        /**
          * GET /speedtest/statistics
          * Get speed test statistics for admin dashboard
+         * Requires JWT authentication (admin only)
          */
         get("/statistics") {
             try {
+                // Extract and validate JWT token
+                val token = call.request.header("Authorization")?.removePrefix("Bearer ")
+                    ?: return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Missing authorization token")
+                    )
+                
+                // Validate JWT
+                try {
+                    Jwt.getUserIdFromToken(token)
+                } catch (e: Exception) {
+                    logger.warn("Invalid JWT token: ${e.message}")
+                    return@get call.respond(
+                        HttpStatusCode.Unauthorized,
+                        mapOf("error" to "Invalid authorization token")
+                    )
+                }
+                
                 val statistics = speedTestService.getSpeedTestStatistics()
                 
                 call.respond(HttpStatusCode.OK, mapOf(
@@ -211,7 +299,7 @@ fun Route.vpnFeaturesRoutes() {
                 ))
                 
             } catch (e: Exception) {
-                call.application.environment.log.error("Error getting speed test statistics", e)
+                logger.error("Error getting speed test statistics", e)
                 call.respond(
                     HttpStatusCode.InternalServerError,
                     mapOf("error" to "Failed to get speed test statistics")
@@ -220,8 +308,8 @@ fun Route.vpnFeaturesRoutes() {
         }
     }
     
-    // Split Tunneling Routes
-    route("/splittunneling") {
+    // Split Tunneling Routes (existing functionality)
+    route("/split-tunneling") {
         
         /**
          * GET /splittunneling/config/{userId}

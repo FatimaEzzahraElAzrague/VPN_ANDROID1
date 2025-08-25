@@ -47,7 +47,7 @@ fun WelcomeScreen(
     Box(modifier = Modifier.fillMaxSize()) {
         VideoPlayer(
             modifier = Modifier.fillMaxSize(),
-            uri = videoUri
+            uri = videoUri.toString()
         )
 
         // Dark overlay for better text visibility

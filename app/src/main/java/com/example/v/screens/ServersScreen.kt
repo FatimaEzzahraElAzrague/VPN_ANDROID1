@@ -31,7 +31,8 @@ fun ServersScreen(
     onThemeToggle: () -> Unit,
     onServerSelect: (Server) -> Unit,
     onServerFavorite: (Server) -> Unit,
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onVPNPermissionRequest: () -> Unit
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }

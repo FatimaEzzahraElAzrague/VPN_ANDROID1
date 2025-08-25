@@ -1,232 +1,312 @@
 package com.myapp.backend.services
 
-import com.myapp.backend.config.ServerConfig
-import com.myapp.backend.models.VPNConnectionRequest
-import com.myapp.backend.models.VPNConnectionResponse
+import com.myapp.backend.models.*
+import com.myapp.backend.repositories.VPNRepository
 import com.myapp.backend.config.Env
-import io.ktor.client.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import kotlinx.serialization.json.*
-import mu.KotlinLogging
-import org.bouncycastle.crypto.generators.X25519KeyPairGenerator
-import org.bouncycastle.crypto.params.X25519KeyGenerationParameters
-import org.bouncycastle.crypto.params.X25519PrivateKeyParameters
-import org.bouncycastle.crypto.params.X25519PublicKeyParameters
-import java.security.SecureRandom
-import java.util.*
-import kotlin.text.Charsets.UTF_8
+import org.slf4j.LoggerFactory
+import java.time.LocalDateTime
 
-private val logger = KotlinLogging.logger {}
-
+/**
+ * Production-ready VPN Service
+ * Handles VPN configuration generation and connection management
+ */
 class VPNService {
-    private val client = HttpClient()
-    private val secureRandom = SecureRandom()
-
-    suspend fun createConnection(request: VPNConnectionRequest): VPNConnectionResponse {
-        logger.info { "Creating VPN connection for location: ${request.location}" }
+    
+    companion object {
+        private val logger = LoggerFactory.getLogger(VPNService::class.java)
+        
+        @Volatile
+        private var INSTANCE: VPNService? = null
+        
+        fun getInstance(): VPNService {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: VPNService().also { INSTANCE = it }
+            }
+        }
+    }
+    
+    private val repository = VPNRepository()
+    
+    init {
+        // Initialize default VPN servers
+        repository.initializeDefaultVPNServers()
+        logger.info("VPNService initialized with default servers")
+    }
+    
+    /**
+     * Get VPN configuration for a user and server
+     */
+    fun getVPNConfiguration(userId: String, serverId: String): VPNConfigResponse {
+        logger.info("Getting VPN configuration for user: $userId, server: $serverId")
         
         try {
-            // Get server configuration
-            val server = ServerConfig.getServer(request.location) ?: throw IllegalArgumentException("Invalid location: ${request.location}")
-            logger.debug { "Using server: ${server.name} (${server.ip}:${server.listenPort})" }
-        
-        // Generate WireGuard keys
-        val (privateKey, publicKey) = generateWireGuardKeys()
-        logger.debug { "Generated WireGuard keys" }
-        
-        // Generate preshared key
-        val presharedKey = generatePresharedKey()
-        logger.debug { "Generated preshared key" }
-        
-        // Get next available IP
-        val usedIPs = getUsedIPs(server.ip, server.agentPort)
-        val internalIP = getNextAvailableIP(usedIPs, server.subnet)
-        logger.debug { "Assigned internal IP: $internalIP" }
-        
-        // Generate IPv6 address
-        val ipv6 = "${server.ipv6Base}${internalIP.split('.').last()}"
-        logger.debug { "Assigned internal IPv6: $ipv6" }
-        
-        // Add peer to WireGuard server
-        addPeerToAgent(
-            serverIP = server.ip,
-            agentPort = server.agentPort,
-            publicKey = publicKey,
-            internalIP = internalIP,
-            internalIPv6 = ipv6,
-            presharedKey = presharedKey
-        )
-        
-        // Determine DNS servers based on filtering options
-        val dns = when {
-            request.adBlockEnabled && request.antiMalwareEnabled && request.familySafeModeEnabled -> {
-                ServerConfig.FilteringDNS.FULL_FILTERING
-            }
-            request.antiMalwareEnabled -> {
-                ServerConfig.FilteringDNS.ANTI_MALWARE
-            }
-            request.adBlockEnabled -> {
-                ServerConfig.FilteringDNS.AD_BLOCK
-            }
-            request.familySafeModeEnabled -> {
-                ServerConfig.FilteringDNS.FAMILY_SAFE
-            }
-            else -> {
-                ServerConfig.FilteringDNS.DEFAULT
-            }
-        }
-        
-        // Build client configuration
-        val clientConfig = buildClientConfig(
-            privateKey = privateKey,
-            internalIP = internalIP,
-            internalIPv6 = ipv6,
-            dns = dns,
-            serverPublicKey = server.serverPublicKey,
-            presharedKey = presharedKey,
-            serverEndpoint = "${server.ip}:${server.listenPort}"
-        )
-        
-        val response = VPNConnectionResponse(
-            privateKey = privateKey,
-            publicKey = publicKey,
-            serverPublicKey = server.serverPublicKey,
-            serverEndpoint = "${server.ip}:${server.listenPort}",
-            allowedIPs = "0.0.0.0/0,::/0",
-            internalIP = internalIP,
-            dns = dns,
-            mtu = 1420,
-            presharedKey = presharedKey,
-            internalIPv6 = ipv6,
-            clientConfig = clientConfig
-        )
-        logger.info { "VPN connection created successfully for ${request.location}" }
-        return response
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to create VPN connection for ${request.location}" }
-            throw e
-        }
-    }
-
-    private fun generateWireGuardKeys(): Pair<String, String> {
-        val generator = X25519KeyPairGenerator()
-        generator.init(X25519KeyGenerationParameters(secureRandom))
-        val keyPair = generator.generateKeyPair()
-        
-        val privateKey = keyPair.private as X25519PrivateKeyParameters
-        val publicKey = keyPair.public as X25519PublicKeyParameters
-        
-        return Base64.getEncoder().encodeToString(privateKey.encoded) to
-               Base64.getEncoder().encodeToString(publicKey.encoded)
-    }
-
-    private fun generatePresharedKey(): String {
-        val key = ByteArray(32)
-        secureRandom.nextBytes(key)
-        return Base64.getEncoder().encodeToString(key)
-    }
-
-    private suspend fun getUsedIPs(serverIP: String, agentPort: Int): Set<String> {
-        return try {
-            val response = client.get("http://$serverIP:$agentPort/api/used-ips") {
-                header("Authorization", "Bearer ${Env.agentToken}")
+            // Get VPN server
+            val server = repository.getVPNServerById(serverId)
+            if (server == null) {
+                return VPNConfigResponse(
+                    success = false,
+                    message = "VPN server not found",
+                    error = "Server $serverId does not exist or is inactive"
+                )
             }
             
-            if (response.status == HttpStatusCode.OK) {
-                val json = Json.parseToJsonElement(response.bodyAsText())
-                json.jsonObject["used_ips"]?.jsonArray
-                    ?.mapNotNull { it.jsonPrimitive.contentOrNull?.split('/')?.first() }
-                    ?.toSet() ?: emptySet()
-            } else {
-                logger.warn { "Failed to get used IPs from agent: ${response.status}" }
-                emptySet()
-            }
+            // Get or create client configuration
+            val clientConfig = repository.getOrCreateClientConfig(userId, serverId)
+            
+            // Generate WireGuard configuration
+            val wireguardConfig = generateWireGuardConfig(server, clientConfig)
+            
+            // Create connection configuration
+            val connectionConfig = VPNConnectionConfig(
+                server = server,
+                clientConfig = clientConfig,
+                wireguardConfig = wireguardConfig,
+                connectionTimeout = 30000,
+                keepAlive = 25,
+                persistentKeepalive = 25
+            )
+            
+            logger.info("VPN configuration generated successfully for user: $userId, server: $serverId")
+            
+            return VPNConfigResponse(
+                success = true,
+                message = "VPN configuration generated successfully",
+                config = connectionConfig
+            )
+            
         } catch (e: Exception) {
-            logger.error(e) { "Error getting used IPs from agent" }
-            emptySet()
-        }
-    }
-
-    private fun getNextAvailableIP(usedIPs: Set<String>, subnet: String): String {
-        val parts = subnet.split('/')
-        val baseIP = parts[0].split('.')
-        val prefix = baseIP.take(3).joinToString(".")
-        
-        // Start from .10 to avoid network, gateway, and DNS server addresses
-        for (i in 10..254) {
-            val candidate = "$prefix.$i"
-            if (candidate !in usedIPs) {
-                return candidate
-            }
-        }
-        throw IllegalStateException("No available IPs in subnet")
-    }
-
-    private suspend fun addPeerToAgent(
-        serverIP: String,
-        agentPort: Int,
-        publicKey: String,
-        internalIP: String,
-        internalIPv6: String,
-        presharedKey: String
-    ) {
-        val response = client.post("http://$serverIP:$agentPort/api/peers") {
-            header("Authorization", "Bearer ${Env.agentToken}")
-            contentType(ContentType.Application.Json)
-            setBody(
-                if (agentPort == 8000) {
-                    // Legacy API format
-                    """{"pubkey":"$publicKey","preshared_key":"$presharedKey","ip":"$internalIP/32"}"""
-                } else {
-                    // New API format
-                    """{"pubkey":"$publicKey","preshared_key":"$presharedKey","ips":["$internalIP/32","$internalIPv6/128"]}"""
-                }
+            logger.error("Error generating VPN configuration for user: $userId, server: $serverId", e)
+            return VPNConfigResponse(
+                success = false,
+                message = "Failed to generate VPN configuration",
+                error = e.message
             )
         }
+    }
+    
+    /**
+     * Get VPN configurations for both Osaka and Paris servers for a user
+     */
+    fun getVPNConfigurationsForUser(userId: String): VPNConfigResponse {
+        logger.info("Getting VPN configurations for user: $userId (Osaka and Paris)")
         
-        if (response.status != HttpStatusCode.OK) {
-            throw IllegalStateException("Failed to add peer to agent: ${response.status}")
+        try {
+            // Get both Osaka and Paris servers
+            val osakaServer = repository.getVPNServerById("osaka")
+            val parisServer = repository.getVPNServerById("paris")
+            
+            if (osakaServer == null || parisServer == null) {
+                return VPNConfigResponse(
+                    success = false,
+                    message = "VPN servers not found",
+                    error = "Osaka or Paris server is not available"
+                )
+            }
+            
+            // Get or create client configurations for both servers
+            val osakaClientConfig = repository.getOrCreateClientConfig(userId, "osaka")
+            val parisClientConfig = repository.getOrCreateClientConfig(userId, "paris")
+            
+            // Generate WireGuard configurations
+            val osakaWireguardConfig = generateWireGuardConfig(osakaServer, osakaClientConfig)
+            val parisWireguardConfig = generateWireGuardConfig(parisServer, parisClientConfig)
+            
+            // Create connection configurations
+            val osakaConnectionConfig = VPNConnectionConfig(
+                server = osakaServer,
+                clientConfig = osakaClientConfig,
+                wireguardConfig = osakaWireguardConfig,
+                connectionTimeout = 30000,
+                keepAlive = 25,
+                persistentKeepalive = 25
+            )
+            
+            val parisConnectionConfig = VPNConnectionConfig(
+                server = parisServer,
+                clientConfig = parisClientConfig,
+                wireguardConfig = parisWireguardConfig,
+                connectionTimeout = 30000,
+                keepAlive = 25,
+                persistentKeepalive = 25
+            )
+            
+            logger.info("VPN configurations generated successfully for user: $userId")
+            
+            return VPNConfigResponse(
+                success = true,
+                message = "VPN configurations generated successfully",
+                configs = mapOf(
+                    "osaka" to osakaConnectionConfig,
+                    "paris" to parisConnectionConfig
+                )
+            )
+            
+        } catch (e: Exception) {
+            logger.error("Error generating VPN configurations for user: $userId", e)
+            return VPNConfigResponse(
+                success = false,
+                message = "Failed to generate VPN configurations",
+                error = e.message
+            )
         }
     }
-
-    private fun buildClientConfig(
-        privateKey: String,
-        internalIP: String,
-        internalIPv6: String,
-        dns: String,
-        serverPublicKey: String,
-        presharedKey: String,
-        serverEndpoint: String,
-        allowedIPs: String = "0.0.0.0/0,::/0"
-    ): String {
-        val gatewayIP = internalIP.split('.').take(3).joinToString(".") + ".1"
+    
+    /**
+     * Get available VPN servers
+     */
+    fun getAvailableVPNServers(): List<VPNServer> {
+        logger.debug("Getting available VPN servers")
+        return repository.getAvailableVPNServers()
+    }
+    
+    /**
+     * Get VPN server by ID
+     */
+    fun getVPNServerById(serverId: String): VPNServer? {
+        logger.debug("Getting VPN server by ID: $serverId")
+        return repository.getVPNServerById(serverId)
+    }
+    
+    /**
+     * Update connection status
+     */
+    fun updateConnectionStatus(
+        userId: String,
+        serverId: String,
+        status: String,
+        error: String? = null,
+        bytesReceived: Long = 0,
+        bytesSent: Long = 0
+    ) {
+        logger.info("Updating connection status for user: $userId, server: $serverId, status: $status")
+        repository.updateConnectionStatus(userId, serverId, status, error, bytesReceived, bytesSent)
+    }
+    
+    /**
+     * Get connection status
+     */
+    fun getConnectionStatus(userId: String, serverId: String): VPNConnectionStatus? {
+        logger.debug("Getting connection status for user: $userId, server: $serverId")
+        return repository.getConnectionStatus(userId, serverId)
+    }
+    
+    /**
+     * Generate WireGuard configuration file content
+     */
+    private fun generateWireGuardConfig(server: VPNServer, clientConfig: VPNClientConfig): String {
+        val dnsServers = server.dnsServers.joinToString(", ")
         
         return """
             [Interface]
-            PrivateKey = $privateKey
-            Address = $internalIP/32,$internalIPv6/128
-            DNS = $dns
-            MTU = 1420
-
+            PrivateKey = ${clientConfig.privateKey}
+            Address = ${clientConfig.address}/32
+            DNS = $dnsServers
+            MTU = ${server.mtu}
+            
             [Peer]
-            PublicKey = $serverPublicKey
-            PresharedKey = $presharedKey
-            Endpoint = $serverEndpoint
-            AllowedIPs = $allowedIPs
+            PublicKey = ${server.wireguardPublicKey}
+            Endpoint = ${server.wireguardEndpoint}
+            AllowedIPs = ${server.allowedIPs}
             PersistentKeepalive = 25
         """.trimIndent()
     }
-
-    companion object {
-        private var instance: VPNService? = null
+    
+    /**
+     * Validate WireGuard configuration
+     */
+    fun validateWireGuardConfig(config: String): Boolean {
+        return try {
+            val lines = config.lines()
+            val hasInterface = lines.any { it.startsWith("[Interface]") }
+            val hasPeer = lines.any { it.startsWith("[Peer]") }
+            val hasPrivateKey = lines.any { it.startsWith("PrivateKey = ") }
+            val hasPublicKey = lines.any { it.startsWith("PublicKey = ") }
+            val hasEndpoint = lines.any { it.startsWith("Endpoint = ") }
+            val hasAddress = lines.any { it.startsWith("Address = ") }
+            
+            hasInterface && hasPeer && hasPrivateKey && hasPublicKey && hasEndpoint && hasAddress
+        } catch (e: Exception) {
+            logger.error("Error validating WireGuard configuration", e)
+            false
+        }
+    }
+    
+    /**
+     * Get VPN server statistics
+     */
+    fun getVPNServerStatistics(): Map<String, Any> {
+        logger.debug("Getting VPN server statistics")
         
-        fun getInstance(): VPNService {
-            if (instance == null) {
-                instance = VPNService()
+        val servers = repository.getAvailableVPNServers()
+        
+        return mapOf(
+            "totalServers" to servers.size,
+            "activeServers" to servers.count { it.isActive },
+            "servers" to servers.map { server ->
+                mapOf(
+                    "id" to server.id,
+                    "name" to server.name,
+                    "city" to server.city,
+                    "country" to server.country,
+                    "ip" to server.ip,
+                    "port" to server.port,
+                    "isActive" to server.isActive,
+                    "priority" to server.priority
+                )
             }
-            return instance!!
+        )
+    }
+
+    /**
+     * Get minimal VPN configuration for Android app (exact format needed)
+     */
+    fun getMinimalVPNConfigForUser(userId: String): VPNConfigResponse {
+        logger.info("Getting minimal VPN configuration for user: $userId")
+        
+        try {
+            // Get or create client configurations for both servers
+            val osakaClientConfig = repository.getOrCreateClientConfig(userId, "osaka")
+            val parisClientConfig = repository.getOrCreateClientConfig(userId, "paris")
+            
+            // Create minimal configs in the exact format needed
+            val osakaConfig = mapOf(
+                "server_ip" to Env.osakaServerIp,
+                "server_port" to Env.osakaServerPort,
+                "server_public_key" to Env.osakaServerPublicKey,
+                "client_private_key" to osakaClientConfig.privateKey,
+                "client_public_key" to osakaClientConfig.publicKey,
+                "allowed_ips" to "0.0.0.0/0",
+                "dns" to "8.8.8.8"
+            )
+            
+            val parisConfig = mapOf(
+                "server_ip" to Env.parisServerIp,
+                "server_port" to Env.parisServerPort,
+                "server_public_key" to Env.parisServerPublicKey,
+                "client_private_key" to parisClientConfig.privateKey,
+                "client_public_key" to parisClientConfig.publicKey,
+                "allowed_ips" to "0.0.0.0/0",
+                "dns" to "8.8.8.8"
+            )
+            
+            logger.info("Minimal VPN configurations generated successfully for user: $userId")
+            
+            return VPNConfigResponse(
+                success = true,
+                message = "Minimal VPN configurations generated successfully",
+                configs = mapOf(
+                    "osaka" to osakaConfig,
+                    "paris" to parisConfig
+                )
+            )
+            
+        } catch (e: Exception) {
+            logger.error("Error generating minimal VPN configuration for user: $userId", e)
+            return VPNConfigResponse(
+                success = false,
+                message = "Failed to generate minimal VPN configuration",
+                error = e.message
+            )
         }
     }
 }
